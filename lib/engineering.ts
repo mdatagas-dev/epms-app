@@ -22,12 +22,12 @@ export const MOTION_VALUE_CLASSES: MotionValueClass[] = ["va", "nva", "nnva"];
 
 export type YamazumiRow = { stationCode: string; processCode: string; timeType: string; seconds: number };
 
-export function buildYamazumiSeries(rows: YamazumiRow[], taktSeconds: number) {
+export function buildYamazumiSeries(rows: YamazumiRow[], taktSeconds: number, stationCodes: string[] = []) {
   if (!Number.isFinite(taktSeconds) || taktSeconds <= 0) throw new Error("Yamazumi takt must be greater than 0 seconds.");
-  if (rows.length === 0) throw new Error("Yamazumi requires at least one station load.");
+  if (rows.length === 0 && stationCodes.length === 0) throw new Error("Yamazumi requires at least one station.");
   if (rows.some((row) => !Number.isFinite(row.seconds) || row.seconds <= 0)) throw new Error("Yamazumi element time must be greater than 0 seconds.");
 
-  const grouped = new Map<string, YamazumiRow[]>();
+  const grouped = new Map<string, YamazumiRow[]>(stationCodes.map((code) => [code, []]));
   for (const row of rows) grouped.set(row.stationCode, [...(grouped.get(row.stationCode) ?? []), row]);
   const stations = [...grouped.entries()].map(([code, segments]) => {
     const totalSeconds = segments.reduce((sum, segment) => sum + segment.seconds, 0);

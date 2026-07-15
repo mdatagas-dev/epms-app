@@ -232,6 +232,7 @@ td strong { font-weight: 650; }
 .yamazumi-legend { display: flex; flex-wrap: wrap; gap: 12px; padding-bottom: 8px; }
 .yamazumi-legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; background: #4777df; }
 .yamazumi-legend span[data-type="machine_automatic"]::before { background: #1f8a77; }
+.yamazumi-legend span[data-status="underloaded"]::before { background: #8a98a2; }
 .yamazumi-legend span[data-status="overloaded"]::before { background: var(--red); }
 .yamazumi-scroll { overflow-x: auto; padding: 16px 20px 0; }
 .yamazumi-scroll-inner { min-width: max(100%, calc(var(--station-count) * 82px)); }
@@ -243,7 +244,7 @@ td strong { font-weight: 650; }
 .yama-column { display: flex; align-items: end; justify-content: center; height: 100%; }
 .yama-bar { display: flex; flex-direction: column-reverse; width: 42px; min-height: 3px; overflow: hidden; border: 1px solid transparent; border-radius: 4px 4px 1px 1px; background: #dfe4e7; }
 .yama-bar--overloaded { border-color: var(--red); box-shadow: 0 0 0 2px rgba(184,52,52,.1); }
-.yama-bar--underloaded { opacity: .68; }
+.yama-bar--underloaded { border-color: #8a98a2; background: #d7dde0; opacity: .78; }
 .yama-bar span { display: block; min-height: 2px; background: #4777df; border-top: 1px solid rgba(255,255,255,.48); }
 .yama-bar span[data-type="machine_automatic"] { background: #1f8a77; }
 .yama-labels { padding: 8px 0 3px; }
@@ -253,6 +254,7 @@ td strong { font-weight: 650; }
 .yama-label small { padding: 3px 5px; border-radius: 4px; color: var(--muted); font-size: 7px; }
 .yama-label small[data-status="overloaded"] { background: #fff0ed; color: var(--red); }
 .yama-label small[data-status="balanced"] { background: var(--blue-soft); color: var(--blue); }
+.yama-label small[data-status="underloaded"] { background: #edf0f1; color: #657580; }
 .yamazumi-guidance { margin: 14px 20px 20px; padding: 11px 13px; border-radius: 7px; background: #eef4f1; color: #2e6e5d; }
 .yamazumi-guidance--warn { background: #fff3e2; color: var(--amber); }
 .yamazumi-guidance strong { font-size: 10px; }

@@ -377,7 +377,10 @@ async function upsertMaster(entity: MasterEntity, id: string, input: ReturnType<
       : await db.query("INSERT INTO stations (line_id, code, name, sequence) VALUES ($1,$2,$3,$4) RETURNING id, code AS label", [values.lineId, values.code, values.name, values.sequence]);
   } else if (entity === "process") {
     result = id
-      ? await db.query("UPDATE process_elements SET code = $2, name = $3, time_type = $4 WHERE id = $1 AND active RETURNING id, code AS label", [id, values.code, values.name, values.timeType])
+      ? await db.query(`UPDATE process_elements SET code = $2, name = $3, time_type = $4
+          WHERE id = $1 AND active
+            AND NOT EXISTS (SELECT 1 FROM standard_time_revisions WHERE process_element_id = $1)
+          RETURNING id, code AS label`, [id, values.code, values.name, values.timeType])
       : await db.query("INSERT INTO process_elements (code, name, time_type) VALUES ($1,$2,$3) RETURNING id, code AS label", [values.code, values.name, values.timeType]);
   } else {
     const shiftValues = [values.name, values.durationSeconds, values.breakSeconds, values.meetingSeconds, values.setupSeconds, values.otherStopSeconds];
@@ -389,7 +392,7 @@ async function upsertMaster(entity: MasterEntity, id: string, input: ReturnType<
           (name, duration_seconds, break_seconds, meeting_seconds, setup_seconds, other_stop_seconds)
           VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name AS label`, shiftValues);
   }
-  if (result.rowCount !== 1) throw new Error("Active master data was not found.");
+  if (result.rowCount !== 1) throw new Error(entity === "process" && id ? "Referenced process elements are immutable. Create a new master record instead." : "Active master data was not found.");
   return result.rows[0] as { id: string; label: string };
 }
 
