@@ -20,6 +20,36 @@ export type MotionObservation = { category: MotionCategory; valueClass: MotionVa
 export const MOTION_CATEGORIES: MotionCategory[] = ["walking", "searching", "picking", "holding", "inspection", "machine_time", "waiting", "transportation"];
 export const MOTION_VALUE_CLASSES: MotionValueClass[] = ["va", "nva", "nnva"];
 
+export type YamazumiRow = { stationCode: string; processCode: string; timeType: string; seconds: number };
+
+export function buildYamazumiSeries(rows: YamazumiRow[], taktSeconds: number) {
+  if (!Number.isFinite(taktSeconds) || taktSeconds <= 0) throw new Error("Yamazumi takt must be greater than 0 seconds.");
+  if (rows.length === 0) throw new Error("Yamazumi requires at least one station load.");
+  if (rows.some((row) => !Number.isFinite(row.seconds) || row.seconds <= 0)) throw new Error("Yamazumi element time must be greater than 0 seconds.");
+
+  const grouped = new Map<string, YamazumiRow[]>();
+  for (const row of rows) grouped.set(row.stationCode, [...(grouped.get(row.stationCode) ?? []), row]);
+  const stations = [...grouped.entries()].map(([code, segments]) => {
+    const totalSeconds = segments.reduce((sum, segment) => sum + segment.seconds, 0);
+    const utilizationPct = (totalSeconds / taktSeconds) * 100;
+    return {
+      code,
+      totalSeconds: round(totalSeconds),
+      utilizationPct: round(utilizationPct),
+      status: utilizationPct > 100 ? "overloaded" as const : utilizationPct < 85 ? "underloaded" as const : "balanced" as const,
+      excessSeconds: round(Math.max(totalSeconds - taktSeconds, 0)),
+      segments,
+    };
+  });
+  const scaleSeconds = round(Math.max(taktSeconds, ...stations.map((station) => station.totalSeconds)) * 1.1);
+
+  return {
+    scaleSeconds,
+    taktPositionPct: round((taktSeconds / scaleSeconds) * 100),
+    stations,
+  };
+}
+
 export function calculateMotionSummary(observations: MotionObservation[]) {
   if (observations.length === 0) throw new Error("Minimal one motion observation is required.");
   if (observations.some((item) => !MOTION_CATEGORIES.includes(item.category))) throw new Error("Motion category is not valid.");

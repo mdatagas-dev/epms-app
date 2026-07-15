@@ -148,3 +148,29 @@ test("rejects an unknown motion category from untrusted input", () => {
     { category: "other" as never, valueClass: "nva", seconds: 10 },
   ]), /category/i);
 });
+
+test("builds Yamazumi station status against scenario takt", () => {
+  const buildYamazumiSeries = (engineering as unknown as {
+    buildYamazumiSeries?: (rows: Array<{ stationCode: string; processCode: string; timeType: string; seconds: number }>, taktSeconds: number) => {
+      scaleSeconds: number;
+      taktPositionPct: number;
+      stations: Array<{ code: string; totalSeconds: number; utilizationPct: number; status: string; excessSeconds: number }>;
+    };
+  }).buildYamazumiSeries;
+  assert.equal(typeof buildYamazumiSeries, "function");
+
+  const result = buildYamazumiSeries!([
+    { stationCode: "S01", processCode: "P01", timeType: "manual", seconds: 20 },
+    { stationCode: "S01", processCode: "P02", timeType: "machine_automatic", seconds: 20 },
+    { stationCode: "S02", processCode: "P03", timeType: "manual", seconds: 55 },
+    { stationCode: "S03", processCode: "P04", timeType: "manual", seconds: 65 },
+  ], 60);
+
+  assert.equal(result.scaleSeconds, 71.5);
+  assert.equal(result.taktPositionPct, 83.92);
+  assert.deepEqual(result.stations.map(({ code, totalSeconds, utilizationPct, status, excessSeconds }) => ({ code, totalSeconds, utilizationPct, status, excessSeconds })), [
+    { code: "S01", totalSeconds: 40, utilizationPct: 66.67, status: "underloaded", excessSeconds: 0 },
+    { code: "S02", totalSeconds: 55, utilizationPct: 91.67, status: "balanced", excessSeconds: 0 },
+    { code: "S03", totalSeconds: 65, utilizationPct: 108.33, status: "overloaded", excessSeconds: 5 },
+  ]);
+});

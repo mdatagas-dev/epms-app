@@ -144,7 +144,7 @@ export async function getTimeStudy(id: string) {
 
 export async function getLineBalanceData() {
   const masters = await getMasterData();
-  const [standards, balances, assignments] = await Promise.all([
+  const [standards, balances, assignments, scenarios] = await Promise.all([
     db.query(`
       SELECT str.id, str.model_id, str.line_id, str.process_element_id, str.revision,
              str.standard_time_seconds, pe.code, pe.name, pe.time_type,
@@ -173,8 +173,14 @@ export async function getLineBalanceData() {
       JOIN process_elements pe ON pe.id = str.process_element_id
       ORDER BY s.sequence, pe.code
     `),
+    db.query(`
+      SELECT id, line_balance_id, scenario_number, name, target_quantity,
+             takt_time_seconds, status, created_at
+      FROM capacity_scenarios
+      ORDER BY (status = 'approved') DESC, created_at DESC
+    `),
   ]);
-  return { ...masters, standards: standards.rows, balances: balances.rows, assignments: assignments.rows };
+  return { ...masters, standards: standards.rows, balances: balances.rows, assignments: assignments.rows, scenarios: scenarios.rows };
 }
 
 export async function getScenarioData() {
