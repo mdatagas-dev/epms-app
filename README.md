@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EPMS
 
-## Getting Started
+Engineering Process Management System for controlled Time Studies, Standard Time approval, Line Balance, capacity scenarios, and theoretical manpower calculations.
 
-First, run the development server:
+## MVP workflow
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```text
+Raw cycle observations
+  → submitted Time Study
+  → approved Standard Time revision
+  → Line Balance / Yamazumi
+  → versioned capacity scenario
+  → approved Engineering conclusion
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Production actuals, OEE, Pareto, incident management, and reusable Excel import are intentionally outside this release.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Local setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Requirements: Node.js 20.9+ and Docker.
 
-## Learn More
+```bash
+cp .env.example .env.local
+docker compose up -d postgres
+npm install
+npm run db:migrate
+npm run db:seed
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open [http://localhost:3000](http://localhost:3000). Set strong, distinct seed passwords in `.env.local`; public signup is disabled.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Verification
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm test
+npm run lint
+npm run build
+```
 
-## Deploy on Vercel
+## Internal-server deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Provision PostgreSQL and set `DATABASE_URL`.
+2. Set a random `BETTER_AUTH_SECRET` of at least 32 characters and the internal HTTPS URL in `BETTER_AUTH_URL`.
+3. Run `npm ci`, `npm run db:migrate`, `npm run build`, and `npm start`.
+4. Place the app behind the company reverse proxy with HTTPS.
+5. Back up PostgreSQL daily and test restore procedures periodically.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Do not run `npm run db:seed` in production with example passwords. Account provisioning remains an internal Engineering administration task for this MVP.
+
+## Formula contract
+
+- `Normal Time = valid average × performance rating`
+- `Standard Time = Normal Time ÷ (1 − allowance)`
+- `Takt Time = available production seconds ÷ target quantity`
+- `Theoretical Capacity = floor(available time ÷ bottleneck CT)`
+- `Theoretical Manpower = ceil(total manual work content ÷ Takt Time)`
+- `Line Efficiency = total assigned work content ÷ (active stations × bottleneck CT)`
