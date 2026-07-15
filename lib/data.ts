@@ -14,7 +14,8 @@ export async function getDashboardData() {
       JOIN product_models pm ON pm.id = lb.model_id
       JOIN production_lines pl ON pl.id = lb.line_id
       JOIN stations st ON st.id = cs.bottleneck_station_id
-      ORDER BY (cs.status = 'approved') DESC, cs.created_at DESC LIMIT 1
+      WHERE cs.status = 'approved'
+      ORDER BY cs.created_at DESC LIMIT 1
     `),
     db.query(`
       SELECT

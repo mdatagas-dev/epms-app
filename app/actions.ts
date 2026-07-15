@@ -249,11 +249,19 @@ export async function createLineBalance(formData: FormData) {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const valid = await client.query(`
-      SELECT count(*)::int AS count FROM standard_time_revisions
-      WHERE id = ANY($1::uuid[]) AND model_id = $2 AND line_id = $3 AND superseded_at IS NULL
-    `, [assignments.map((item) => item.standardTimeRevisionId), modelId, lineId]);
-    if (valid.rows[0].count !== assignments.length) throw new Error("Assignment memakai Standard Time yang tidak valid.");
+    const stationIds = [...new Set(assignments.map((item) => item.stationId))];
+    const [validStandards, validStations] = await Promise.all([
+      client.query(`
+        SELECT count(*)::int AS count FROM standard_time_revisions
+        WHERE id = ANY($1::uuid[]) AND model_id = $2 AND line_id = $3 AND superseded_at IS NULL
+      `, [assignments.map((item) => item.standardTimeRevisionId), modelId, lineId]),
+      client.query(`
+        SELECT count(*)::int AS count FROM stations
+        WHERE id = ANY($1::uuid[]) AND line_id = $2 AND active
+      `, [stationIds, lineId]),
+    ]);
+    if (validStandards.rows[0].count !== assignments.length) throw new Error("Assignment memakai Standard Time yang tidak valid.");
+    if (validStations.rows[0].count !== stationIds.length) throw new Error("Assignment memakai station dari line yang tidak valid.");
     const revision = (await client.query("SELECT coalesce(max(revision), 0)::int + 1 AS revision FROM line_balances WHERE model_id = $1 AND line_id = $2", [modelId, lineId])).rows[0].revision;
     const balance = await client.query(`
       INSERT INTO line_balances (name, model_id, line_id, revision, created_by)
@@ -280,7 +288,7 @@ export async function createCapacityScenario(formData: FormData) {
   const shiftTemplateId = required(formData, "shiftTemplateId");
   const targetQuantity = numberField(formData, "targetQuantity");
   const [shiftResult, assignmentResult] = await Promise.all([
-    db.query("SELECT * FROM shift_templates WHERE id = $1", [shiftTemplateId]),
+    db.query("SELECT * FROM shift_templates WHERE id = $1 AND active", [shiftTemplateId]),
     db.query(`
       SELECT s.id AS station_id, s.code AS station_code, pe.time_type,
              str.standard_time_seconds
