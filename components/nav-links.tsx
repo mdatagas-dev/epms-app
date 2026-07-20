@@ -14,12 +14,12 @@ const links = [
   { href: "/master-data", label: "Master Data", icon: "master" as const },
 ];
 
-export function NavLinks() {
+export function NavLinks({ onNavigate }: { onNavigate?: () => void } = {}) {
   const pathname = usePathname();
   return <nav className="side-nav" aria-label="Primary navigation">
     {links.map((link) => {
       const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
-      return <Link key={link.href} href={link.href} className="nav-link" aria-current={active ? "page" : undefined}>
+      return <Link key={link.href} href={link.href} className="nav-link" aria-current={active ? "page" : undefined} onClick={onNavigate}>
         <Icon name={link.icon} /><span>{link.label}</span>{active && <span className="nav-indicator" />}
       </Link>;
     })}

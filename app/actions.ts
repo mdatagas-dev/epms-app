@@ -8,13 +8,13 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { calculateLineScenario, calculateMotionSummary, calculateStandardTime, type CycleObservation, type MotionObservation } from "@/lib/engineering";
 import { parseMasterInput, type MasterEntity } from "@/lib/master-data";
-import { requireSupervisor, requireUser } from "@/lib/session";
+import { requireAuth } from "@/lib/session";
 
 export type ActionState = { error?: string } | undefined;
 export type MasterActionState = { error?: string; success?: string } | undefined;
 
 export async function saveMasterData(_: MasterActionState, formData: FormData): Promise<MasterActionState> {
-  const supervisor = await requireSupervisor();
+  const supervisor = await requireAuth("supervisor");
   const entity = masterEntity(formData);
   const id = String(formData.get("id") ?? "").trim();
   if (id && !isUuid(id)) return { error: "Master data ID is not valid." };
@@ -35,7 +35,7 @@ export async function saveMasterData(_: MasterActionState, formData: FormData): 
 }
 
 export async function deactivateMasterData(formData: FormData) {
-  const supervisor = await requireSupervisor();
+  const supervisor = await requireAuth("supervisor");
   const entity = masterEntity(formData);
   const id = required(formData, "id");
   if (!isUuid(id)) throw new Error("Master data ID is not valid.");
@@ -63,12 +63,13 @@ export async function loginAction(_: ActionState, formData: FormData): Promise<A
 }
 
 export async function logoutAction() {
+  await requireAuth();
   await auth.api.signOut({ headers: await headers() });
   redirect("/login");
 }
 
 export async function createTimeStudy(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireAuth();
   const modelId = required(formData, "modelId");
   const lineId = required(formData, "lineId");
   const processElementId = required(formData, "processElementId");
@@ -114,7 +115,7 @@ export async function createTimeStudy(formData: FormData) {
 }
 
 export async function createMotionStudy(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireAuth();
   const name = required(formData, "name");
   const modelId = required(formData, "modelId");
   const lineId = required(formData, "lineId");
@@ -161,7 +162,7 @@ export async function createMotionStudy(formData: FormData) {
 }
 
 export async function submitTimeStudy(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireAuth();
   const id = required(formData, "id");
   const result = await db.query(`
     UPDATE time_studies SET status = 'submitted', submitted_at = now(), updated_at = now()
@@ -174,7 +175,7 @@ export async function submitTimeStudy(formData: FormData) {
 }
 
 export async function approveTimeStudy(formData: FormData) {
-  const supervisor = await requireSupervisor();
+  const supervisor = await requireAuth("supervisor");
   const id = required(formData, "id");
   const client = await db.connect();
   try {
@@ -225,7 +226,7 @@ export async function approveTimeStudy(formData: FormData) {
 }
 
 export async function rejectTimeStudy(formData: FormData) {
-  const supervisor = await requireSupervisor();
+  const supervisor = await requireAuth("supervisor");
   const id = required(formData, "id");
   const comment = required(formData, "comment");
   const result = await db.query(`
@@ -239,7 +240,7 @@ export async function rejectTimeStudy(formData: FormData) {
 }
 
 export async function createLineBalance(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireAuth();
   const name = required(formData, "name");
   const modelId = required(formData, "modelId");
   const lineId = required(formData, "lineId");
@@ -282,7 +283,7 @@ export async function createLineBalance(formData: FormData) {
 }
 
 export async function createCapacityScenario(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireAuth();
   const name = required(formData, "name");
   const lineBalanceId = required(formData, "lineBalanceId");
   const shiftTemplateId = required(formData, "shiftTemplateId");
@@ -338,7 +339,7 @@ export async function createCapacityScenario(formData: FormData) {
 }
 
 export async function submitScenario(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireAuth();
   const id = required(formData, "id");
   const result = await db.query("UPDATE capacity_scenarios SET status = 'submitted' WHERE id = $1 AND status = 'draft' RETURNING scenario_number", [id]);
   if (result.rowCount !== 1) throw new Error("Scenario tidak dapat diajukan.");
@@ -348,7 +349,7 @@ export async function submitScenario(formData: FormData) {
 }
 
 export async function approveScenario(formData: FormData) {
-  const supervisor = await requireSupervisor();
+  const supervisor = await requireAuth("supervisor");
   const id = required(formData, "id");
   const result = await db.query(`
     UPDATE capacity_scenarios SET status = 'approved', approved_by = $2, approved_at = now()

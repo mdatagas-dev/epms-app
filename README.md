@@ -30,6 +30,27 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Set strong, distinct seed passwords in `.env.local`; public signup is disabled.
 
+## Docker Compose
+
+To run the complete system in containers:
+
+```bash
+cp .env.example .env.local
+# Replace every example secret and password in .env.local first.
+docker compose up -d --build
+docker compose run --rm app npm run db:seed
+```
+
+Open [http://localhost:3000](http://localhost:3000). The stack waits for PostgreSQL, applies the database migrations, and then starts the application. Run the seed command only once when initializing a new installation.
+
+```bash
+docker compose ps
+docker compose logs -f app
+docker compose down
+```
+
+The PostgreSQL volume is persistent. Do not add `--volumes` to `docker compose down` unless you intentionally want to delete all EPMS data.
+
 ## Verification
 
 ```bash

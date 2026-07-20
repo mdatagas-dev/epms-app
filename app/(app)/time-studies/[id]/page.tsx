@@ -6,9 +6,10 @@ import { getTimeStudy } from "@/lib/data";
 import { calculateStandardTime } from "@/lib/engineering";
 import { requireUser } from "@/lib/session";
 
+const dateFormatter = new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" });
+
 export default async function TimeStudyDetailPage({ params }: PageProps<"/time-studies/[id]">) {
-  const { id } = await params;
-  const user = await requireUser();
+  const [{ id }, user] = await Promise.all([params, requireUser()]);
   const { study, cycles, standard } = await getTimeStudy(id);
   if (!study) notFound();
   const observations = cycles.map((cycle) => ({ seconds: Number(cycle.observed_seconds), excluded: cycle.is_excluded, exclusionReason: cycle.exclusion_reason ?? undefined }));
@@ -33,4 +34,4 @@ export default async function TimeStudyDetailPage({ params }: PageProps<"/time-s
   </main>;
 }
 
-function formatDate(value: string) { return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(new Date(value)); }
+function formatDate(value: string) { return dateFormatter.format(new Date(value)); }

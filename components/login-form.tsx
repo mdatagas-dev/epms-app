@@ -10,14 +10,14 @@ export function LoginForm() {
     <form action={action} className="form-stack">
       <label className="field">
         <span>Account</span>
-        <input name="email" type="email" autoComplete="username" placeholder="name@epms.local" required autoFocus />
+        <input name="email" type="email" autoComplete="username" placeholder="name@epms.local" required />
       </label>
       <label className="field">
         <span>Password</span>
         <input name="password" type="password" autoComplete="current-password" placeholder="••••••••••••" required />
       </label>
       {state?.error && <p className="form-error" role="alert">{state.error}</p>}
-      <button className="button button--primary button--full" disabled={pending}>
+      <button type="submit" className="button button--primary button--full" disabled={pending}>
         <span>{pending ? "Memeriksa…" : "Masuk ke EPMS"}</span>
         <span aria-hidden="true">→</span>
       </button>

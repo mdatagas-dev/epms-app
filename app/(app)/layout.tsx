@@ -1,4 +1,5 @@
 import { logoutAction } from "@/app/actions";
+import { MobileNavigation } from "@/components/mobile-navigation";
 import { NavLinks } from "@/components/nav-links";
 import { requireUser } from "@/lib/session";
 
@@ -10,11 +11,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <NavLinks />
       <div className="sidebar-foot">
         <div className="user-card"><span className="avatar">{user.name.slice(0, 1)}</span><div><strong>{user.name}</strong><span>{user.role === "supervisor" ? "Engineering Supervisor" : "Process Engineer"}</span></div></div>
-        <form action={logoutAction}><button className="text-button">Keluar</button></form>
+        <form action={logoutAction}><button type="submit" className="text-button">Keluar</button></form>
       </div>
     </aside>
     <div className="app-content">
-      <header className="mobile-header"><div className="brand-lockup"><span className="brand-mark">E</span><strong>EPMS</strong></div><span className="status-dot">Internal</span></header>
+      <MobileNavigation name={user.name} role={user.role} />
       {children}
     </div>
   </div>;

@@ -15,7 +15,7 @@ export default async function LoginPage() {
         </div>
         <div className="login-copy">
           <p className="eyebrow">Internal engineering system</p>
-          <h1 id="login-title">Data proses yang bisa dipertanggungjawabkan.</h1>
+          <h1 id="login-title">Data proses yang bisa dipertanggung&shy;jawabkan.</h1>
           <p>Time Study, Standard Time, Line Balance, dan capacity scenario dalam satu evidence chain.</p>
         </div>
         <LoginForm />

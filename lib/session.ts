@@ -17,8 +17,8 @@ export async function requireUser() {
   return user;
 }
 
-export async function requireSupervisor() {
+export async function requireAuth(role?: "engineer" | "supervisor") {
   const user = await requireUser();
-  if (user.role !== "supervisor") throw new Error("Forbidden");
+  if (role && user.role !== role) throw new Error("Forbidden");
   return user;
 }

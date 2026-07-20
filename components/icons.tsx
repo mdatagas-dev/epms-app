@@ -1,4 +1,4 @@
-type IconName = "dashboard" | "study" | "motion" | "balance" | "scenario" | "master" | "arrow" | "clock" | "check";
+type IconName = "dashboard" | "study" | "motion" | "balance" | "scenario" | "master" | "arrow" | "clock" | "check" | "menu" | "close";
 
 const paths: Record<IconName, React.ReactNode> = {
   dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
@@ -10,6 +10,8 @@ const paths: Record<IconName, React.ReactNode> = {
   arrow: <path d="m9 18 6-6-6-6"/>,
   clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
   check: <path d="m5 12 4 4L19 6"/>,
+  menu: <><path d="M4 7h16M4 12h16M4 17h16"/></>,
+  close: <path d="m6 6 12 12M18 6 6 18"/>,
 };
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {

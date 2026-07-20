@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Icon } from "@/components/icons";
 import { getDashboardData } from "@/lib/data";
 
+const activityDateFormatter = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
 export default async function DashboardPage() {
   const { scenario, pending, activities, standards } = await getDashboardData();
   return <main className="page-shell">
@@ -44,4 +46,4 @@ function Metric({ label, value, unit, note, tone, wide }: { label: string; value
   return <article className={`metric-card ${tone ? `metric-card--${tone}` : ""} ${wide ? "metric-card--wide" : ""}`}><span>{label}</span><div><strong>{value}</strong><small>{unit}</small></div><p>{note}</p></article>;
 }
 
-function formatDate(value: string) { return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
+function formatDate(value: string) { return activityDateFormatter.format(new Date(value)); }
