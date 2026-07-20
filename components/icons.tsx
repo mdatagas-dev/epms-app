@@ -1,4 +1,4 @@
-type IconName = "dashboard" | "study" | "motion" | "balance" | "scenario" | "master" | "arrow" | "clock" | "check" | "menu" | "close";
+type IconName = "dashboard" | "study" | "motion" | "balance" | "scenario" | "translate" | "master" | "arrow" | "clock" | "check" | "menu" | "close";
 
 const paths: Record<IconName, React.ReactNode> = {
   dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
@@ -6,6 +6,7 @@ const paths: Record<IconName, React.ReactNode> = {
   motion: <><path d="M4 18c4-8 7-11 16-12"/><path d="m15 4 5 2-2 5"/><circle cx="6" cy="17" r="2"/></>,
   balance: <><path d="M4 19V8M10 19V4M16 19v-7M22 19H2"/></>,
   scenario: <><path d="M4 18 9 9l4 5 3-8 4 12"/><path d="M3 21h18"/></>,
+  translate: <><path d="M4 5h7M7.5 3v2c0 4-2 7-5 9"/><path d="M4 9c1 2 3 4 6 5M13 20l4-10 4 10M14.5 17h5"/></>,
   master: <><path d="M4 4h16v5H4zM4 13h7v7H4zM15 13h5v7h-5z"/></>,
   arrow: <path d="m9 18 6-6-6-6"/>,
   clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,

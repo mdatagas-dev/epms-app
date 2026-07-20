@@ -11,6 +11,7 @@ const links = [
   { href: "/motion-studies", label: "Motion Study", icon: "motion" as const },
   { href: "/line-balance", label: "Line Balance", icon: "balance" as const },
   { href: "/scenarios", label: "Capacity", icon: "scenario" as const },
+  { href: "/instruction-translator", label: "IK Translator", icon: "translate" as const },
   { href: "/master-data", label: "Master Data", icon: "master" as const },
 ];
 
