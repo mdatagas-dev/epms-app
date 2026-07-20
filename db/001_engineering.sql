@@ -225,3 +225,7 @@ CREATE TABLE IF NOT EXISTS activities (
 CREATE INDEX IF NOT EXISTS activities_created_at_idx ON activities (created_at DESC);
 CREATE INDEX IF NOT EXISTS time_studies_status_idx ON time_studies (status, updated_at DESC);
 CREATE INDEX IF NOT EXISTS motion_studies_created_at_idx ON motion_studies (created_at DESC);
+
+UPDATE "user"
+SET username = lower(split_part(email, '@', 1))
+WHERE username IS NULL;

@@ -9,8 +9,8 @@ export function LoginForm() {
   return (
     <form action={action} className="form-stack">
       <label className="field">
-        <span>Account</span>
-        <input name="email" type="email" autoComplete="username" placeholder="name@epms.local" required />
+        <span>Username</span>
+        <input name="username" type="text" autoComplete="username" placeholder="Username" required />
       </label>
       <label className="field">
         <span>Password</span>

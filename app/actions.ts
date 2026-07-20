@@ -50,14 +50,14 @@ export async function deactivateMasterData(formData: FormData) {
 }
 
 export async function loginAction(_: ActionState, formData: FormData): Promise<ActionState> {
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  if (!email || !password) return { error: "Account dan password wajib diisi." };
+  if (!username || !password) return { error: "Username dan password wajib diisi." };
 
   try {
-    await auth.api.signInEmail({ body: { email, password }, headers: await headers() });
+    await auth.api.signInUsername({ body: { username, password }, headers: await headers() });
   } catch {
-    return { error: "Account atau password tidak sesuai." };
+    return { error: "Username atau password tidak sesuai." };
   }
   redirect("/dashboard");
 }

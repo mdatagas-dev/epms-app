@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
+import { username } from "better-auth/plugins";
 
 import { db } from "./pool.ts";
 
@@ -20,7 +21,7 @@ export const auth = betterAuth({
       },
     },
   },
-  plugins: [nextCookies()],
+  plugins: [username(), nextCookies()],
 });
 
 export type CurrentUser = typeof auth.$Infer.Session.user;

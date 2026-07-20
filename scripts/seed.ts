@@ -4,12 +4,14 @@ import { db } from "../lib/pool.ts";
 const users = [
   {
     email: requiredEnv("EPMS_ENGINEER_EMAIL"),
+    username: requiredEnv("EPMS_ENGINEER_EMAIL").split("@", 1)[0],
     password: requiredEnv("EPMS_ENGINEER_PASSWORD"),
     name: "Raka Engineer",
     role: "engineer",
   },
   {
     email: requiredEnv("EPMS_SUPERVISOR_EMAIL"),
+    username: requiredEnv("EPMS_SUPERVISOR_EMAIL").split("@", 1)[0],
     password: requiredEnv("EPMS_SUPERVISOR_PASSWORD"),
     name: "Maya Supervisor",
     role: "supervisor",
@@ -20,7 +22,7 @@ for (const user of users) {
   const existing = await db.query('SELECT id FROM "user" WHERE email = $1', [user.email]);
   if (existing.rowCount === 0) {
     await auth.api.signUpEmail({
-      body: { email: user.email, password: user.password, name: user.name },
+      body: { email: user.email, username: user.username, password: user.password, name: user.name },
     });
   }
   await db.query('UPDATE "user" SET role = $1 WHERE email = $2', [user.role, user.email]);
