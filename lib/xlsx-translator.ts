@@ -3,8 +3,10 @@ import JSZip from "jszip";
 const chineseCharacter = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
 const textNode = /<t(\s[^>]*)?>([\s\S]*?)<\/t>/g;
 const sharedString = /<si(?:\s[^>]*)?>[\s\S]*?<\/si>/g;
-const cell = /<c\b([^>]*)>([\s\S]*?)<\/c>/g;
+const cell = /<c\b([^>]*?)(?<!\/)>([\s\S]*?)<\/c>/g;
 const inlineString = /<is(?:\s[^>]*)?>[\s\S]*?<\/is>/;
+const drawingParagraph = /<a:p(?:\s[^>]*)?>[\s\S]*?<\/a:p>/g;
+const drawingTextNode = /<a:t(\s[^>]*)?>([\s\S]*?)<\/a:t>/g;
 
 export async function extractChinesePhrases(workbook: ArrayBuffer) {
   const zip = await loadWorkbook(workbook);
@@ -34,6 +36,14 @@ export async function extractChinesePhrases(workbook: ArrayBuffer) {
     });
   }
 
+  for (const path of drawingFiles(zip)) {
+    const xml = await zip.file(path)!.async("string");
+    for (const paragraph of xml.matchAll(drawingParagraph)) {
+      const value = readDrawingText(paragraph[0]);
+      if (chineseCharacter.test(value)) phrases.add(value);
+    }
+  }
+
   return [...phrases];
 }
 
@@ -55,6 +65,12 @@ export async function buildTranslatedWorkbook(workbook: ArrayBuffer, translation
     }), { createFolders: false });
   }
 
+  for (const path of drawingFiles(zip)) {
+    const file = zip.file(path)!;
+    const xml = await file.async("string");
+    zip.file(path, xml.replace(drawingParagraph, (paragraph) => translateDrawingText(paragraph, translations)), { createFolders: false });
+  }
+
   return zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
 }
 
@@ -70,6 +86,10 @@ function worksheetFiles(zip: JSZip) {
   return Object.keys(zip.files).filter((path) => /^xl\/worksheets\/[^/]+\.xml$/.test(path));
 }
 
+function drawingFiles(zip: JSZip) {
+  return Object.keys(zip.files).filter((path) => /^xl\/drawings\/[^/]+\.xml$/.test(path));
+}
+
 function readText(xml: string) {
   return [...xml.matchAll(textNode)].map((match) => decodeXml(match[2])).join("");
 }
@@ -78,12 +98,36 @@ function translateText(xml: string, translations: Record<string, string>) {
   const translation = translations[readText(xml)];
   if (!translation?.trim()) return xml;
 
-  let first = true;
+  const chunks = splitAcrossTextNodes(translation.trim(), [...xml.matchAll(textNode)].length);
+  let index = 0;
   return xml.replace(textNode, (_node, attributes = "") => {
-    const value = first ? escapeXml(translation.trim()) : "";
-    first = false;
+    const value = escapeXml(chunks[index++]);
     const spacing = attributes.includes("xml:space=") ? "" : " xml:space=\"preserve\"";
     return `<t${attributes}${spacing}>${value}</t>`;
+  });
+}
+
+function readDrawingText(xml: string) {
+  return [...xml.matchAll(drawingTextNode)].map((match) => decodeXml(match[2])).join("");
+}
+
+function translateDrawingText(xml: string, translations: Record<string, string>) {
+  const translation = translations[readDrawingText(xml)];
+  if (!translation?.trim()) return xml;
+
+  const chunks = splitAcrossTextNodes(translation.trim(), [...xml.matchAll(drawingTextNode)].length);
+  let index = 0;
+  return xml.replace(drawingTextNode, (_node, attributes = "") => {
+    const value = escapeXml(chunks[index++]);
+    return `<a:t${attributes}>${value}</a:t>`;
+  });
+}
+
+function splitAcrossTextNodes(value: string, count: number) {
+  const characters = [...value];
+  return Array.from({ length: count }, (_, index) => {
+    const chunk = characters.slice(Math.floor(index * characters.length / count), Math.floor((index + 1) * characters.length / count)).join("");
+    return chunk || "\u200b";
   });
 }
 

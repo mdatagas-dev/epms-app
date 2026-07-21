@@ -401,6 +401,15 @@ td strong { font-weight: 650; }
 .translator-source p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.55; }
 .translator-row textarea { width: 100%; min-height: 58px; resize: vertical; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--ink); padding: 9px 11px; outline: none; font-size: 12px; line-height: 1.5; }
 .translator-error { margin: 0; padding: 11px 13px; font-size: 11px; }
+.company-template-review { overflow: hidden; }
+.company-metadata { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--line); background: var(--muted-surface); }
+.company-step-list { display: grid; gap: 12px; padding: 18px; }
+.company-step { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 13px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); }
+.company-step-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.company-step-head strong { font-size: 12px; }
+.company-step-head > span { color: var(--muted); font-size: 10px; }
+.company-step-head > div { display: flex; gap: 4px; margin-left: auto; }
+.company-step textarea { width: 100%; resize: vertical; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface); color: var(--ink); padding: 9px 11px; outline: none; font-size: 11px; line-height: 1.5; }
 
 @media (hover: hover) and (pointer: fine) {
   .button--primary:hover { background: var(--blue-dark); }
@@ -488,6 +497,9 @@ td strong { font-weight: 650; }
   .translator-actions { flex-direction: column; }
   .translator-row { grid-template-columns: 1fr; gap: 14px; padding: 16px; }
   .translator-phrases { max-height: none; }
+  .company-metadata, .company-step { grid-template-columns: 1fr; }
+  .company-step-head { grid-column: 1; align-items: flex-start; flex-wrap: wrap; }
+  .company-step-head > div { width: 100%; margin-left: 0; }
   .form-actions { align-items: stretch; flex-direction: column; }
   .empty-state { align-items: flex-start; flex-wrap: wrap; }
   .empty-state .button { width: 100%; margin-left: 0; }

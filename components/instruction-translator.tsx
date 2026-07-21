@@ -2,16 +2,21 @@
 
 import { useState } from "react";
 
+import { buildCompanyTemplate, extractCompanyInstruction, type TemplateMetadata, type TemplateStep } from "@/lib/company-template";
 import { buildTranslatedWorkbook, extractChinesePhrases } from "@/lib/xlsx-translator";
 
 const maxFileSize = 10 * 1024 * 1024;
+const translationBatchSize = 10;
+const companyTemplateUrl = "/templates/company-work-instruction.xlsx";
 
 type Phrase = { source: string; translation: string };
-type BusyState = "extracting" | "translating" | "downloading" | null;
+type BusyState = "extracting" | "translating" | "downloading" | "preparing-template" | "building-template" | null;
 
 export function InstructionTranslator() {
   const [file, setFile] = useState<File | null>(null);
   const [phrases, setPhrases] = useState<Phrase[]>([]);
+  const [templateMetadata, setTemplateMetadata] = useState<TemplateMetadata | null>(null);
+  const [templateSteps, setTemplateSteps] = useState<TemplateStep[]>([]);
   const [busy, setBusy] = useState<BusyState>(null);
   const [error, setError] = useState("");
 
@@ -22,6 +27,8 @@ export function InstructionTranslator() {
     setError("");
     setFile(null);
     setPhrases([]);
+    setTemplateMetadata(null);
+    setTemplateSteps([]);
     if (!nextFile) return;
     if (!nextFile.name.toLowerCase().endsWith(".xlsx")) return setError("Choose an .xlsx workbook. Legacy and macro-enabled files are not supported.");
     if (nextFile.size > maxFileSize) return setError("The workbook exceeds the 10 MB upload limit.");
@@ -45,21 +52,37 @@ export function InstructionTranslator() {
     setBusy("translating");
     setError("");
     try {
-      const response = await fetch("/api/instruction-translator/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phrases: pending.map((phrase) => phrase.source) }),
-      });
-      const result = await response.json() as { translations?: string[]; error?: string };
-      if (!response.ok || !result.translations) throw new Error(result.error ?? "AI translation failed.");
-      const translations = result.translations;
-      const translated = new Map(pending.map((phrase, index) => [phrase.source, translations[index]]));
-      setPhrases((current) => current.map((phrase) => phrase.translation.trim() ? phrase : { ...phrase, translation: translated.get(phrase.source) ?? "" }));
+      for (let offset = 0; offset < pending.length; offset += translationBatchSize) {
+        await translateBatch(pending.slice(offset, offset + translationBatchSize));
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "AI translation failed. You can continue manually.");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function translateBatch(batch: Phrase[]): Promise<void> {
+    const response = await fetch("/api/instruction-translator/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phrases: batch.map((phrase) => phrase.source) }),
+    });
+    const result = await response.json() as { translations?: string[]; error?: string };
+
+    if (!response.ok || !result.translations) {
+      const error = result.error ?? "AI translation failed.";
+      const providerFailure = /usage limit|rate limit|fetch failed|unavailable|timed? out|ECONN/i.test(error);
+      if (batch.length === 1 || providerFailure) throw new Error(error);
+      const midpoint = Math.ceil(batch.length / 2);
+      await translateBatch(batch.slice(0, midpoint));
+      await translateBatch(batch.slice(midpoint));
+      return;
+    }
+
+    const translations = result.translations;
+    const translated = new Map(batch.map((phrase, index) => [phrase.source, translations[index]]));
+    setPhrases((current) => current.map((phrase) => phrase.translation.trim() ? phrase : { ...phrase, translation: translated.get(phrase.source) ?? "" }));
   }
 
   async function downloadWorkbook() {
@@ -82,12 +105,67 @@ export function InstructionTranslator() {
     }
   }
 
+  async function prepareCompanyTemplate() {
+    if (!file || missing) return;
+    setError("");
+    setTemplateMetadata(null);
+    setTemplateSteps([]);
+
+    setBusy("preparing-template");
+    try {
+      const translations = Object.fromEntries(phrases.map((phrase) => [phrase.source, phrase.translation]));
+      const translated = await buildTranslatedWorkbook(await file.arrayBuffer(), translations);
+      const draft = await extractCompanyInstruction(translated);
+      setTemplateMetadata(draft.metadata);
+      setTemplateSteps(draft.steps);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The company-template draft could not be prepared.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadCompanyTemplate() {
+    if (!templateMetadata || !templateSteps.length) return;
+    setBusy("building-template");
+    setError("");
+    try {
+      const response = await fetch(companyTemplateUrl);
+      if (!response.ok) throw new Error("The approved company template could not be loaded.");
+      const output = await buildCompanyTemplate(await response.arrayBuffer(), templateMetadata, templateSteps);
+      const url = URL.createObjectURL(new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${templateMetadata.ikNumber || "work-instruction"}-company-template.xlsx`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The company-template workbook could not be created.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function updateStep(index: number, update: Partial<TemplateStep>) {
+    setTemplateSteps((current) => current.map((step, stepIndex) => stepIndex === index ? { ...step, ...update } : step));
+  }
+
+  function moveStep(index: number, offset: number) {
+    setTemplateSteps((current) => {
+      const target = index + offset;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   return <div className="translator-workflow">
     <section className="panel translator-upload">
       <div>
         <p className="eyebrow">Source workbook</p>
         <h2>{file?.name ?? "Choose a work instruction"}</h2>
-        <p>Upload one XLSX file up to 10 MB. Cell text is extracted in your browser; images, formulas, styles, merges, and print settings remain unchanged.</p>
+        <p>Upload one XLSX file up to 10 MB. Cell and drawing text is extracted in your browser; images, formulas, styles, merges, and print settings remain unchanged.</p>
       </div>
       <label className="button button--secondary translator-file-button">
         {busy === "extracting" ? "Reading workbook..." : file ? "Choose another file" : "Choose XLSX"}
@@ -109,6 +187,26 @@ export function InstructionTranslator() {
           <div className="translator-source"><span>Chinese · {index + 1}</span><p lang="zh-CN">{phrase.source}</p></div>
           <label><span>English</span><textarea value={phrase.translation} rows={Math.min(6, Math.max(2, phrase.source.split("\n").length))} placeholder="Enter or generate the English translation" onChange={(event) => setPhrases((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, translation: event.target.value } : item))}/></label>
         </div>)}
+      </div>
+    </section>}
+
+    {file && missing === 0 && <section className="panel translator-upload">
+      <div><p className="eyebrow">Company template</p><h2>Apply the approved company layout</h2><p>EPMS drafts one page per numbered work step using the built-in company template while preserving fixed labels, branding, styles, and print setup.</p></div>
+      <button type="button" className="button button--secondary" disabled={busy !== null} onClick={() => void prepareCompanyTemplate()}>{busy === "preparing-template" ? "Preparing steps..." : templateMetadata ? "Refresh company draft" : "Prepare company template"}</button>
+    </section>}
+
+    {templateMetadata && <section className="panel company-template-review">
+      <div className="translator-toolbar"><div><p className="eyebrow">Template review</p><h2>{templateSteps.length} work-step pages</h2><p>Review metadata, instructions, key points, order, and matched source photos before export.</p></div><button type="button" className="button button--primary" disabled={busy !== null} onClick={() => void downloadCompanyTemplate()}>{busy === "building-template" ? "Building template..." : "Download company XLSX"}</button></div>
+      <div className="company-metadata">
+        {([['ikNumber', 'IK number'], ['revision', 'Revision'], ['date', 'Date'], ['product', 'Product'], ['station', 'Station'], ['series', 'Series'], ['cycleTime', 'Cycle time'], ['model', 'Model'], ['author', 'Author']] as Array<[keyof TemplateMetadata, string]>).map(([key, label]) => <label className="field" key={key}><span>{label}</span><input value={templateMetadata[key]} onChange={(event) => setTemplateMetadata((current) => current ? { ...current, [key]: event.target.value } : current)}/></label>)}
+      </div>
+      <div className="company-step-list">
+        {templateSteps.map((step, index) => <article className="company-step" key={index}>
+          <div className="company-step-head"><strong>Page {index + 1}</strong><span>{step.images.length} source photo{step.images.length === 1 ? "" : "s"}</span><div><button type="button" className="text-button" disabled={index === 0} onClick={() => moveStep(index, -1)}>Move up</button><button type="button" className="text-button" disabled={index === templateSteps.length - 1} onClick={() => moveStep(index, 1)}>Move down</button></div></div>
+          <label className="field"><span>Page title</span><input value={step.title} onChange={(event) => updateStep(index, { title: event.target.value })}/></label>
+          <label className="field"><span>Work steps</span><textarea rows={5} value={step.instruction} onChange={(event) => updateStep(index, { instruction: event.target.value })}/></label>
+          <label className="field"><span>Key points (one per line)</span><textarea rows={4} value={step.keyPoints.join("\n")} onChange={(event) => updateStep(index, { keyPoints: event.target.value.split("\n") })}/></label>
+        </article>)}
       </div>
     </section>}
 
