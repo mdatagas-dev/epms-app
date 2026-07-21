@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/login-form";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getCurrentUser } from "@/lib/session";
 
 export default async function LoginPage() {
@@ -9,6 +10,7 @@ export default async function LoginPage() {
   return (
     <main className="login-shell">
       <section className="login-panel" aria-labelledby="login-title">
+        <div className="login-theme"><ThemeToggle /></div>
         <div className="brand-lockup brand-lockup--login">
           <span className="brand-mark" aria-hidden="true">E</span>
           <div><strong>EPMS</strong><span>Process Engineering</span></div>

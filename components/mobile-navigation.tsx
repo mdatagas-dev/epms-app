@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { logoutAction } from "@/app/actions";
 import { Icon } from "@/components/icons";
 import { NavLinks } from "@/components/nav-links";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function MobileNavigation({ name, role }: { name: string; role: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -21,6 +22,7 @@ export function MobileNavigation({ name, role }: { name: string; role: string })
         <button className="mobile-menu-button" type="button" aria-label="Tutup menu navigasi" onClick={() => dialogRef.current?.close()}><Icon name="close" size={20} /></button>
       </div>
       <NavLinks onNavigate={() => dialogRef.current?.close()} />
+      <div className="mobile-drawer-theme"><ThemeToggle /></div>
       <div className="mobile-drawer-foot">
         <div className="user-card"><span className="avatar">{name.slice(0, 1)}</span><div><strong>{name}</strong><span>{roleLabel}</span></div></div>
         <form action={logoutAction}><button type="submit" className="text-button">Keluar</button></form>

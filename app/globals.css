@@ -76,7 +76,9 @@ a { color: inherit; text-decoration: none; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 .login-shell { min-height: 100vh; display: grid; grid-template-columns: minmax(420px, 46%) 1fr; background: var(--surface); }
-.login-panel { display: flex; flex-direction: column; justify-content: center; padding: clamp(28px, 4.5vw, 72px); border-right: 1px solid var(--line); background: var(--surface); }
+.login-panel { position: relative; display: flex; flex-direction: column; justify-content: center; padding: clamp(28px, 4.5vw, 72px); border-right: 1px solid var(--line); background: var(--surface); }
+.login-theme { position: absolute; top: 24px; right: 24px; }
+.login-theme .theme-toggle { width: auto; min-width: 112px; }
 .login-aside { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: clamp(44px, 7vw, 96px); color: white; background: #0f1b28; }
 .login-grid { position: absolute; inset: 0; opacity: .22; background-image: linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(to bottom right, black, transparent 75%); }
 .brand-lockup { display: flex; align-items: center; gap: 11px; min-width: 0; }
@@ -126,6 +128,10 @@ a { color: inherit; text-decoration: none; }
 .nav-link[aria-current="page"] svg { opacity: 1; color: var(--blue); }
 .nav-indicator { position: absolute; left: -14px; width: 2px; height: 20px; border-radius: 0 3px 3px 0; background: var(--blue); }
 .sidebar-foot { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line); }
+.theme-toggle { display: flex; width: 100%; min-height: 36px; align-items: center; gap: 9px; margin-bottom: 8px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 600; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+.theme-toggle-sun, .theme-toggle-light { display: none; }
+[data-theme="dark"] .theme-toggle-sun, [data-theme="dark"] .theme-toggle-light { display: inline-flex; }
+[data-theme="dark"] .theme-toggle-moon, [data-theme="dark"] .theme-toggle-dark { display: none; }
 .user-card { display: flex; align-items: center; gap: 9px; padding: 7px; }
 .avatar { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--muted-surface); color: var(--muted); font-size: 12px; font-weight: 700; }
 .user-card div { display: grid; min-width: 0; }
@@ -450,7 +456,8 @@ td strong { font-weight: 650; }
   .mobile-drawer .side-nav { display: grid; gap: 4px; margin: 20px 14px; }
   .mobile-drawer .nav-link { height: 44px; }
   .mobile-drawer .nav-indicator { left: -14px; }
-  .mobile-drawer-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding: 16px 14px; border-top: 1px solid var(--line); }
+  .mobile-drawer-theme { margin: auto 14px 0; padding-top: 16px; border-top: 1px solid var(--line); }
+  .mobile-drawer-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 0; padding: 16px 14px; border-top: 1px solid var(--line); }
   .mobile-drawer-foot .user-card { min-width: 0; }
   .page-shell { padding: 24px 16px 48px; }
   .workflow-grid, .workflow-grid > .form-panel { width: calc(100vw - 32px); max-width: calc(100vw - 32px); overflow: hidden; }
