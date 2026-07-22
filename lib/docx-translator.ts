@@ -1,21 +1,51 @@
 import JSZip from "jszip";
 
 const chineseCharacter = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
+const translatableText = /\p{L}/u;
 const paragraph = /<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g;
 const textNode = /<w:t(\s[^>]*)?>([\s\S]*?)<\/w:t>/g;
 const contentFile = /^word\/(?:document|header\d+|footer\d+|footnotes|endnotes|comments)\.xml$/;
+const relationship = /<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/>/g;
+
+export type DocumentBlock = { index: number; text: string; images: Array<{ extension: string; data: Uint8Array }> };
 
 export async function extractChineseDocumentPhrases(document: ArrayBuffer) {
+  return (await extractDocumentPhrases(document)).filter((value) => chineseCharacter.test(value));
+}
+
+export async function extractDocumentPhrases(document: ArrayBuffer) {
   const zip = await loadDocument(document);
   const phrases = new Set<string>();
   for (const path of contentFiles(zip)) {
     const xml = await zip.file(path)!.async("string");
     for (const match of xml.matchAll(paragraph)) {
       const value = readText(match[0]);
-      if (chineseCharacter.test(value)) phrases.add(value);
+      if (translatableText.test(value)) phrases.add(value);
     }
   }
   return [...phrases];
+}
+
+export async function extractDocumentBlocks(document: ArrayBuffer): Promise<DocumentBlock[]> {
+  const zip = await loadDocument(document);
+  const xml = await zip.file("word/document.xml")!.async("string");
+  const relsXml = await zip.file("word/_rels/document.xml.rels")?.async("string") ?? "";
+  const relationships = Object.fromEntries([...relsXml.matchAll(relationship)].map((match) => [match[1], decodeXml(match[2])]));
+  const blocks: DocumentBlock[] = [];
+
+  for (const match of xml.matchAll(paragraph)) {
+    const text = readText(match[0]).trim();
+    const images: DocumentBlock["images"] = [];
+    for (const embed of match[0].matchAll(/<a:blip[^>]*r:embed="([^"]+)"/g)) {
+      const target = relationships[embed[1]];
+      if (!target) continue;
+      const path = normalizePath("word/document.xml", target);
+      const data = await zip.file(path)?.async("uint8array");
+      if (data) images.push({ extension: path.split(".").pop()?.toLowerCase() ?? "png", data });
+    }
+    if (text || images.length) blocks.push({ index: blocks.length, text, images });
+  }
+  return blocks;
 }
 
 export async function buildTranslatedDocument(document: ArrayBuffer, translations: Record<string, string>) {
@@ -67,4 +97,14 @@ function decodeXml(value: string) {
 
 function escapeXml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+function normalizePath(base: string, target: string) {
+  if (target.startsWith("/")) return target.replace(/^\//, "");
+  const parts = base.split("/").slice(0, -1);
+  for (const segment of target.split("/")) {
+    if (segment === "..") parts.pop();
+    else if (segment !== ".") parts.push(segment);
+  }
+  return parts.join("/");
 }

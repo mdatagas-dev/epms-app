@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 
 const chineseCharacter = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
+const translatableText = /\p{L}/u;
 const textNode = /<t(\s[^>]*)?>([\s\S]*?)<\/t>/g;
 const sharedString = /<si(?:\s[^>]*)?>[\s\S]*?<\/si>/g;
 const cell = /<c\b([^>]*?)(?<!\/)>([\s\S]*?)<\/c>/g;
@@ -9,6 +10,10 @@ const drawingParagraph = /<a:p(?:\s[^>]*)?>[\s\S]*?<\/a:p>/g;
 const drawingTextNode = /<a:t(\s[^>]*)?>([\s\S]*?)<\/a:t>/g;
 
 export async function extractChinesePhrases(workbook: ArrayBuffer) {
+  return (await extractWorkbookPhrases(workbook)).filter((value) => chineseCharacter.test(value));
+}
+
+export async function extractWorkbookPhrases(workbook: ArrayBuffer) {
   const zip = await loadWorkbook(workbook);
   const worksheets = worksheetFiles(zip);
   const usedSharedStrings = new Set<number>();
@@ -23,7 +28,7 @@ export async function extractChinesePhrases(workbook: ArrayBuffer) {
       }
       if (/\bt="inlineStr"/.test(match[1])) {
         const value = readText(match[2].match(inlineString)?.[0] ?? "");
-        if (chineseCharacter.test(value)) phrases.add(value);
+        if (translatableText.test(value)) phrases.add(value);
       }
     }
   }
@@ -32,7 +37,7 @@ export async function extractChinesePhrases(workbook: ArrayBuffer) {
   if (sharedXml) {
     Array.from(sharedXml.matchAll(sharedString)).forEach((match, index) => {
       const value = readText(match[0]);
-      if (usedSharedStrings.has(index) && chineseCharacter.test(value)) phrases.add(value);
+      if (usedSharedStrings.has(index) && translatableText.test(value)) phrases.add(value);
     });
   }
 
@@ -40,7 +45,7 @@ export async function extractChinesePhrases(workbook: ArrayBuffer) {
     const xml = await zip.file(path)!.async("string");
     for (const paragraph of xml.matchAll(drawingParagraph)) {
       const value = readDrawingText(paragraph[0]);
-      if (chineseCharacter.test(value)) phrases.add(value);
+      if (translatableText.test(value)) phrases.add(value);
     }
   }
 

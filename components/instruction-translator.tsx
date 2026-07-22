@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 import { buildCompanyTemplate, extractCompanyInstruction, type TemplateMetadata, type TemplateStep } from "@/lib/company-template";
-import { buildTranslatedDocument, extractChineseDocumentPhrases } from "@/lib/docx-translator";
-import { buildTranslatedWorkbook, extractChinesePhrases } from "@/lib/xlsx-translator";
+import { buildTranslatedDocument, extractDocumentBlocks, extractDocumentPhrases } from "@/lib/docx-translator";
+import { buildTranslatedWorkbook, extractWorkbookPhrases } from "@/lib/xlsx-translator";
 
 const maxFileSize = 10 * 1024 * 1024;
 const translationBatchSize = 10;
@@ -15,6 +15,7 @@ type Phrase = { source: string; translation: string };
 type BusyState = "converting" | "extracting" | "translating" | "downloading" | "preparing-template" | "building-template" | null;
 type TargetLanguage = "english" | "indonesian";
 type TranslationMode = TargetLanguage | "production-id";
+type StructuredStep = { title: string; instruction: string; keyPoints: string[]; startBlock: number; endBlock: number };
 
 export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConfigured: boolean }) {
   const [file, setFile] = useState<File | null>(null);
@@ -28,6 +29,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
   const completed = phrases.filter((phrase) => phrase.translation.trim()).length;
   const missing = phrases.length - completed;
   const targetLabel = targetLanguage === "english" ? "English" : "Bahasa Indonesia";
+  const isWord = file?.name.toLowerCase().endsWith(".docx") ?? false;
 
   async function selectFile(nextFile?: File) {
     setError("");
@@ -56,10 +58,10 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
         setBusy("extracting");
       }
       const buffer = await readableFile.arrayBuffer();
-      const sources = readableFile.name.toLowerCase().endsWith(".docx") ? await extractChineseDocumentPhrases(buffer) : await extractChinesePhrases(buffer);
+      const sources = readableFile.name.toLowerCase().endsWith(".docx") ? await extractDocumentPhrases(buffer) : await extractWorkbookPhrases(buffer);
       setFile(readableFile);
       setPhrases(sources.map((source) => ({ source, translation: "" })));
-      if (!sources.length) setError("No Chinese cell text was found in this workbook.");
+      if (!sources.length) setError("No translatable text was found in this document.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The workbook could not be read.");
     } finally {
@@ -126,9 +128,8 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setError("");
     try {
       const translations = Object.fromEntries(phrases.map((phrase) => [phrase.source, phrase.translation]));
-      const word = file.name.toLowerCase().endsWith(".docx");
-      const output = word ? await buildTranslatedDocument(await file.arrayBuffer(), translations) : await buildTranslatedWorkbook(await file.arrayBuffer(), translations);
-      const url = URL.createObjectURL(new Blob([output], { type: word ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const output = isWord ? await buildTranslatedDocument(await file.arrayBuffer(), translations) : await buildTranslatedWorkbook(await file.arrayBuffer(), translations);
+      const url = URL.createObjectURL(new Blob([output], { type: isWord ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       const link = document.createElement("a");
       link.href = url;
       link.download = file.name.replace(/\.(docx|xlsx)$/i, `-${targetLanguage}.$1`);
@@ -150,6 +151,34 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setBusy("preparing-template");
     try {
       const translations = Object.fromEntries(phrases.map((phrase) => [phrase.source, phrase.translation]));
+      if (isWord) {
+        const translated = await buildTranslatedDocument(await file.arrayBuffer(), translations);
+        const blocks = await extractDocumentBlocks(translated);
+        if (!blocks.length) throw new Error("No document content was found for company-IK preparation.");
+        const response = await fetch("/api/instruction-translator/structure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ blocks: blocks.map(({ index, text, images }) => ({ index, text, imageCount: images.length })) }),
+        });
+        const result = await response.json() as { metadata?: TemplateMetadata; steps?: StructuredStep[]; error?: string };
+        if (!response.ok || !result.metadata || !result.steps) throw new Error(result.error ?? "The company-IK draft could not be inferred.");
+
+        const steps: TemplateStep[] = result.steps.map((step) => ({ ...step, images: [] }));
+        for (const block of blocks) {
+          if (!block.images.length) continue;
+          let stepIndex = result.steps.findIndex((step) => block.index >= step.startBlock && block.index <= step.endBlock);
+          if (stepIndex < 0) stepIndex = Math.max(0, result.steps.findLastIndex((step) => step.startBlock <= block.index));
+          steps[stepIndex].images.push(...block.images);
+        }
+        setTemplateMetadata({
+          ...result.metadata,
+          revision: result.metadata.revision || "00",
+          date: result.metadata.date || new Intl.DateTimeFormat("en-GB").format(new Date()),
+        });
+        setTemplateSteps(steps);
+        return;
+      }
+
       const translated = await buildTranslatedWorkbook(await file.arrayBuffer(), translations);
       const draft = await extractCompanyInstruction(translated);
       setTemplateMetadata(draft.metadata);
@@ -229,7 +258,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
 
     {phrases.length > 0 && <section className="panel translator-review">
       <div className="translator-toolbar">
-        <div><p className="eyebrow">Translation review</p><h2>{completed} of {phrases.length} phrases ready</h2><p>Repeated Chinese phrases share one {targetLabel} translation throughout the workbook.</p></div>
+        <div><p className="eyebrow">Translation review</p><h2>{completed} of {phrases.length} phrases ready</h2><p>Source language is detected automatically. Repeated text shares one {targetLabel} translation throughout the document.</p></div>
         <div className="translator-actions">
           <label className="field translator-language"><span>Target language</span><select value={targetLanguage} disabled={busy !== null || completed > 0} onChange={(event) => setTargetLanguage(event.target.value as TargetLanguage)}><option value="english">English</option><option value="indonesian">Bahasa Indonesia</option></select></label>
           <button type="button" className="button button--secondary" disabled={busy !== null || missing === 0} onClick={() => void translateMissing()}>{busy === "translating" ? "Translating..." : `AI translate to ${targetLabel}`}</button>
@@ -239,14 +268,14 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
       <p className="translator-disclosure">AI Translate sends only the extracted cell phrases to the configured 9Router provider. The workbook and embedded images are not sent.</p>
       <div className="translator-phrases">
         {phrases.map((phrase, index) => <div className="translator-row" key={phrase.source}>
-          <div className="translator-source"><span>Chinese · {index + 1}</span><p lang="zh-CN">{phrase.source}</p></div>
+          <div className="translator-source"><span>Source · {index + 1}</span><p>{phrase.source}</p></div>
           <label><span>{targetLabel}</span><textarea value={phrase.translation} rows={Math.min(6, Math.max(2, phrase.source.split("\n").length))} placeholder={`Enter or generate the ${targetLabel} translation`} onChange={(event) => setPhrases((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, translation: event.target.value } : item))}/></label>
         </div>)}
       </div>
     </section>}
 
-    {file?.name.toLowerCase().endsWith(".xlsx") && missing === 0 && targetLanguage === "english" && <section className="panel translator-upload">
-      <div><p className="eyebrow">Company IK · Bahasa Indonesia</p><h2>Apply the approved company layout</h2><p>AI rewrites the reviewed English work content into concise Bahasa Indonesia, then EPMS drafts one page per numbered step while preserving metadata, photos, branding, styles, and print setup.</p></div>
+    {file && missing === 0 && (isWord || targetLanguage === "english") && <section className="panel translator-upload">
+      <div><p className="eyebrow">Company IK · Bahasa Indonesia</p><h2>Apply the approved company layout</h2><p>{isWord ? "AI infers operational steps and nearby photos from the reviewed Word document, then prepares editable Indonesian IK pages." : "AI rewrites the reviewed English work content into concise Bahasa Indonesia, then EPMS drafts one page per numbered step."} Branding, styles, and print setup remain fixed.</p></div>
       <button type="button" className="button button--secondary" disabled={busy !== null} onClick={() => void prepareCompanyTemplate()}>{busy === "preparing-template" ? "Generating Indonesian IK..." : templateMetadata ? "Regenerate Indonesian IK" : "Prepare Indonesian company IK"}</button>
     </section>}
 
