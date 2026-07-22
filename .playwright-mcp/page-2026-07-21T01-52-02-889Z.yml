@@ -1,0 +1,30 @@
+- main [ref=f1e2]:
+  - region [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - generic [ref=f1e5]: E
+      - generic [ref=f1e6]:
+        - strong [ref=f1e7]: EPMS
+        - generic [ref=f1e8]: Process Engineering
+    - generic [ref=f1e9]:
+      - paragraph [ref=f1e10]: Internal engineering system
+      - heading "ENGINEERING PROCESS MANAGEMENT SYSTEM" [level=1] [ref=f1e11]
+      - paragraph [ref=f1e12]: Time Study, Standard Time, Line Balance, dan capacity scenario dalam satu evidence chain.
+    - generic [ref=f1e13]:
+      - generic [ref=f1e14]:
+        - generic [ref=f1e15]: Username
+        - textbox "Username" [ref=f1e16]
+      - generic [ref=f1e17]:
+        - generic [ref=f1e18]: Password
+        - textbox "Password" [ref=f1e19]:
+          - /placeholder: ••••••••••••
+      - button "Masuk ke EPMS" [ref=f1e20] [cursor=pointer]:
+        - generic [ref=f1e22]: →
+    - paragraph [ref=f1e23]: Akun dibuat oleh Engineering Supervisor. Tidak ada registrasi publik.
+  - complementary "System principles" [ref=f1e24]:
+    - generic [ref=f1e26]:
+      - text: CONTROLLED DATA / 01
+      - paragraph [ref=f1e27]: Raw observation tetap tersimpan. Revisi yang disetujui menjadi immutable.
+    - generic [ref=f1e28]:
+      - generic [ref=f1e29]: Standard formula
+      - strong [ref=f1e30]: NT ÷ (1 − A)
+      - generic [ref=f1e31]: Normal Time / Allowance

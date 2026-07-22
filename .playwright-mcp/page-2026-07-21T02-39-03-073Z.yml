@@ -1,0 +1,34 @@
+- generic [active] [ref=f1e1]:
+  - main [ref=f1e2]:
+    - region [ref=f1e3]:
+      - button "Toggle light or dark mode" [ref=f1e5] [cursor=pointer]:
+        - generic [ref=f1e9]: Dark mode
+      - generic [ref=f1e10]:
+        - generic [ref=f1e11]: E
+        - generic [ref=f1e12]:
+          - strong [ref=f1e13]: EPMS
+          - generic [ref=f1e14]: Process Engineering
+      - generic [ref=f1e15]:
+        - paragraph [ref=f1e16]: Internal engineering system
+        - heading "ENGINEERING PROCESS MANAGEMENT SYSTEM" [level=1] [ref=f1e17]
+        - paragraph [ref=f1e18]: Time Study, Standard Time, Line Balance, dan capacity scenario dalam satu evidence chain.
+      - generic [ref=f1e19]:
+        - generic [ref=f1e20]:
+          - generic [ref=f1e21]: Username
+          - textbox "Username" [ref=f1e22]
+        - generic [ref=f1e23]:
+          - generic [ref=f1e24]: Password
+          - textbox "Password" [ref=f1e25]:
+            - /placeholder: ••••••••••••
+        - button "Masuk ke EPMS" [ref=f1e26] [cursor=pointer]:
+          - generic [ref=f1e28]: →
+      - paragraph [ref=f1e29]: Akun dibuat oleh Engineering Supervisor. Tidak ada registrasi publik.
+    - complementary "System principles" [ref=f1e30]:
+      - generic [ref=f1e32]:
+        - text: CONTROLLED DATA / 01
+        - paragraph [ref=f1e33]: Raw observation tetap tersimpan. Revisi yang disetujui menjadi immutable.
+      - generic [ref=f1e34]:
+        - generic [ref=f1e35]: Standard formula
+        - strong [ref=f1e36]: NT ÷ (1 − A)
+        - generic [ref=f1e37]: Normal Time / Allowance
+  - button "Open Next.js Dev Tools" [ref=f1e43] [cursor=pointer]

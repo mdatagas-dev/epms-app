@@ -42,7 +42,7 @@ test("reuses native picture anchors and hides unused template pages", async () =
 
   assert.match(workbook, /<sheet name="1" r:id="rId1"\/>/);
   assert.match(workbook, /<sheet name="Unused 2" r:id="rId2" state="hidden"\/>/);
-  assert.match(worksheet, /Work Steps:\nInstall the motor\./);
+  assert.match(worksheet, /Langkah Kerja:\nInstall the motor\./);
   assert.match(worksheet, /<mergeCell ref="A33:O43"\/>/);
   assert.equal(drawing, `<xdr:wsDr>${pictureAnchor}</xdr:wsDr>`);
   assert.match(drawingRels, /Target="\.\.\/media\/company-step-1-1\.png"/);

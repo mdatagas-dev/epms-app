@@ -11,6 +11,7 @@ const companyTemplateUrl = "/templates/company-work-instruction.xlsx";
 
 type Phrase = { source: string; translation: string };
 type BusyState = "extracting" | "translating" | "downloading" | "preparing-template" | "building-template" | null;
+type TranslationMode = "english" | "production-id";
 
 export function InstructionTranslator() {
   const [file, setFile] = useState<File | null>(null);
@@ -53,7 +54,10 @@ export function InstructionTranslator() {
     setError("");
     try {
       for (let offset = 0; offset < pending.length; offset += translationBatchSize) {
-        await translateBatch(pending.slice(offset, offset + translationBatchSize));
+        const batch = pending.slice(offset, offset + translationBatchSize);
+        const translations = await requestTranslations(batch.map((phrase) => phrase.source), "english");
+        const translated = new Map(batch.map((phrase, index) => [phrase.source, translations[index]]));
+        setPhrases((current) => current.map((phrase) => phrase.translation.trim() ? phrase : { ...phrase, translation: translated.get(phrase.source) ?? "" }));
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "AI translation failed. You can continue manually.");
@@ -62,27 +66,26 @@ export function InstructionTranslator() {
     }
   }
 
-  async function translateBatch(batch: Phrase[]): Promise<void> {
+  async function requestTranslations(phrases: string[], mode: TranslationMode): Promise<string[]> {
     const response = await fetch("/api/instruction-translator/translate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phrases: batch.map((phrase) => phrase.source) }),
+      body: JSON.stringify({ phrases, mode }),
     });
     const result = await response.json() as { translations?: string[]; error?: string };
 
     if (!response.ok || !result.translations) {
       const error = result.error ?? "AI translation failed.";
       const providerFailure = /usage limit|rate limit|fetch failed|unavailable|timed? out|ECONN/i.test(error);
-      if (batch.length === 1 || providerFailure) throw new Error(error);
-      const midpoint = Math.ceil(batch.length / 2);
-      await translateBatch(batch.slice(0, midpoint));
-      await translateBatch(batch.slice(midpoint));
-      return;
+      if (phrases.length === 1 || providerFailure) throw new Error(error);
+      const midpoint = Math.ceil(phrases.length / 2);
+      return [
+        ...await requestTranslations(phrases.slice(0, midpoint), mode),
+        ...await requestTranslations(phrases.slice(midpoint), mode),
+      ];
     }
 
-    const translations = result.translations;
-    const translated = new Map(batch.map((phrase, index) => [phrase.source, translations[index]]));
-    setPhrases((current) => current.map((phrase) => phrase.translation.trim() ? phrase : { ...phrase, translation: translated.get(phrase.source) ?? "" }));
+    return result.translations;
   }
 
   async function downloadWorkbook() {
@@ -118,6 +121,19 @@ export function InstructionTranslator() {
       const draft = await extractCompanyInstruction(translated);
       setTemplateMetadata(draft.metadata);
       setTemplateSteps(draft.steps);
+
+      const sources = [...new Set(draft.steps.flatMap((step) => [step.title, step.instruction, ...step.keyPoints]).filter((value) => value.trim()))];
+      const indonesian: string[] = [];
+      for (let offset = 0; offset < sources.length; offset += translationBatchSize) {
+        indonesian.push(...await requestTranslations(sources.slice(offset, offset + translationBatchSize), "production-id"));
+      }
+      const translatedContent = new Map(sources.map((source, index) => [source, indonesian[index]]));
+      setTemplateSteps(draft.steps.map((step) => ({
+        ...step,
+        title: translatedContent.get(step.title) ?? step.title,
+        instruction: translatedContent.get(step.instruction) ?? step.instruction,
+        keyPoints: step.keyPoints.map((point) => translatedContent.get(point) ?? point),
+      })));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The company-template draft could not be prepared.");
     } finally {
@@ -136,7 +152,7 @@ export function InstructionTranslator() {
       const url = URL.createObjectURL(new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${templateMetadata.ikNumber || "work-instruction"}-company-template.xlsx`;
+      link.download = `${templateMetadata.ikNumber || "work-instruction"}-company-ik-id.xlsx`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (cause) {
@@ -191,21 +207,21 @@ export function InstructionTranslator() {
     </section>}
 
     {file && missing === 0 && <section className="panel translator-upload">
-      <div><p className="eyebrow">Company template</p><h2>Apply the approved company layout</h2><p>EPMS drafts one page per numbered work step using the built-in company template while preserving fixed labels, branding, styles, and print setup.</p></div>
-      <button type="button" className="button button--secondary" disabled={busy !== null} onClick={() => void prepareCompanyTemplate()}>{busy === "preparing-template" ? "Preparing steps..." : templateMetadata ? "Refresh company draft" : "Prepare company template"}</button>
+      <div><p className="eyebrow">Company IK · Bahasa Indonesia</p><h2>Apply the approved company layout</h2><p>AI rewrites the reviewed English work content into concise Bahasa Indonesia, then EPMS drafts one page per numbered step while preserving metadata, photos, branding, styles, and print setup.</p></div>
+      <button type="button" className="button button--secondary" disabled={busy !== null} onClick={() => void prepareCompanyTemplate()}>{busy === "preparing-template" ? "Generating Indonesian IK..." : templateMetadata ? "Regenerate Indonesian IK" : "Prepare Indonesian company IK"}</button>
     </section>}
 
     {templateMetadata && <section className="panel company-template-review">
-      <div className="translator-toolbar"><div><p className="eyebrow">Template review</p><h2>{templateSteps.length} work-step pages</h2><p>Review metadata, instructions, key points, order, and matched source photos before export.</p></div><button type="button" className="button button--primary" disabled={busy !== null} onClick={() => void downloadCompanyTemplate()}>{busy === "building-template" ? "Building template..." : "Download company XLSX"}</button></div>
+      <div className="translator-toolbar"><div><p className="eyebrow">Indonesian IK review</p><h2>{templateSteps.length} work-step pages</h2><p>Review the AI-generated Bahasa Indonesia, metadata, order, and matched source photos before export.</p></div><button type="button" className="button button--primary" disabled={busy !== null} onClick={() => void downloadCompanyTemplate()}>{busy === "building-template" ? "Building company IK..." : "Download Indonesian company IK"}</button></div>
       <div className="company-metadata">
         {([['ikNumber', 'IK number'], ['revision', 'Revision'], ['date', 'Date'], ['product', 'Product'], ['station', 'Station'], ['series', 'Series'], ['cycleTime', 'Cycle time'], ['model', 'Model'], ['author', 'Author']] as Array<[keyof TemplateMetadata, string]>).map(([key, label]) => <label className="field" key={key}><span>{label}</span><input value={templateMetadata[key]} onChange={(event) => setTemplateMetadata((current) => current ? { ...current, [key]: event.target.value } : current)}/></label>)}
       </div>
       <div className="company-step-list">
         {templateSteps.map((step, index) => <article className="company-step" key={index}>
           <div className="company-step-head"><strong>Page {index + 1}</strong><span>{step.images.length} source photo{step.images.length === 1 ? "" : "s"}</span><div><button type="button" className="text-button" disabled={index === 0} onClick={() => moveStep(index, -1)}>Move up</button><button type="button" className="text-button" disabled={index === templateSteps.length - 1} onClick={() => moveStep(index, 1)}>Move down</button></div></div>
-          <label className="field"><span>Page title</span><input value={step.title} onChange={(event) => updateStep(index, { title: event.target.value })}/></label>
-          <label className="field"><span>Work steps</span><textarea rows={5} value={step.instruction} onChange={(event) => updateStep(index, { instruction: event.target.value })}/></label>
-          <label className="field"><span>Key points (one per line)</span><textarea rows={4} value={step.keyPoints.join("\n")} onChange={(event) => updateStep(index, { keyPoints: event.target.value.split("\n") })}/></label>
+          <label className="field"><span>Judul halaman</span><input value={step.title} onChange={(event) => updateStep(index, { title: event.target.value })}/></label>
+          <label className="field"><span>Langkah kerja</span><textarea rows={5} value={step.instruction} onChange={(event) => updateStep(index, { instruction: event.target.value })}/></label>
+          <label className="field"><span>Poin penting (satu per baris)</span><textarea rows={4} value={step.keyPoints.join("\n")} onChange={(event) => updateStep(index, { keyPoints: event.target.value.split("\n") })}/></label>
         </article>)}
       </div>
     </section>}

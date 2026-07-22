@@ -3,7 +3,7 @@ FROM node:24-alpine AS dependencies
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 
 FROM dependencies AS build
 
@@ -15,12 +15,9 @@ RUN npm run build \
     && mkdir -p .next/standalone/.next \
     && cp -r .next/static .next/standalone/.next/
 
-FROM node:24-alpine AS production-dependencies
+FROM dependencies AS production-dependencies
 
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm prune --omit=dev --no-audit --no-fund
 
 FROM production-dependencies AS migration
 
@@ -30,7 +27,7 @@ COPY --from=build --chown=node:node /app/scripts ./scripts
 
 USER node
 
-CMD ["npm", "run", "db:migrate"]
+CMD ["node", "--experimental-strip-types", "scripts/migrate.ts"]
 
 FROM node:24-alpine AS runtime
 

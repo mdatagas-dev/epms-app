@@ -123,7 +123,7 @@ export async function buildCompanyTemplate(workbook: ArrayBuffer, metadata: Temp
       K5: metadata.series,
       M5: metadata.cycleTime,
       O5: metadata.model,
-      A33: `Work Steps:\n${step.instruction}`,
+      A33: `Langkah Kerja:\n${step.instruction}`,
       B49: metadata.author,
     };
     for (const [ref, value] of Object.entries(values)) xml = setCell(xml, ref, value);
