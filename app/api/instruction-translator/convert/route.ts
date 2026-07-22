@@ -9,6 +9,10 @@ import { getCurrentUser } from "@/lib/session";
 
 const run = promisify(execFile);
 const maxFileSize = 10 * 1024 * 1024;
+const formats = {
+  doc: { output: "docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+  xls: { output: "xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+} as const;
 
 export async function POST(request: Request) {
   if (!await getCurrentUser()) return Response.json({ error: "Authentication required." }, { status: 401 });
@@ -19,29 +23,31 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Invalid upload body." }, { status: 400 });
   }
-  if (!(workbook instanceof File) || !workbook.name.toLowerCase().endsWith(".xls") || workbook.size === 0 || workbook.size > maxFileSize) {
-    return Response.json({ error: "Provide one valid .xls workbook up to 10 MB." }, { status: 400 });
+  const extension = workbook instanceof File ? workbook.name.toLowerCase().match(/\.(doc|xls)$/)?.[1] as keyof typeof formats | undefined : undefined;
+  if (!(workbook instanceof File) || !extension || workbook.size === 0 || workbook.size > maxFileSize) {
+    return Response.json({ error: "Provide one valid legacy DOC or XLS file up to 10 MB." }, { status: 400 });
   }
 
   const directory = await mkdtemp(join(tmpdir(), "epms-xls-"));
-  const input = join(directory, "source.xls");
-  const output = join(directory, "source.xlsx");
+  const format = formats[extension];
+  const input = join(directory, `source.${extension}`);
+  const output = join(directory, `source.${format.output}`);
   try {
     await writeFile(input, new Uint8Array(await workbook.arrayBuffer()));
     await run("soffice", [
       `-env:UserInstallation=${pathToFileURL(join(directory, "profile")).href}`,
       "--headless",
       "--convert-to",
-      "xlsx",
+      format.output,
       "--outdir",
       directory,
       input,
     ], { timeout: 120_000 });
     return new Response(await readFile(output), {
-      headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+      headers: { "Content-Type": format.contentType },
     });
   } catch {
-    return Response.json({ error: "The legacy workbook could not be converted. Confirm it opens normally in Excel." }, { status: 422 });
+    return Response.json({ error: "The legacy file could not be converted. Confirm it opens normally in Microsoft Office." }, { status: 422 });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

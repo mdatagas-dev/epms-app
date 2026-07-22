@@ -33,8 +33,10 @@ FROM node:24-bookworm-slim AS runtime
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libreoffice-calc-nogui \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends libreoffice-calc-nogui libreoffice-writer-nogui \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \

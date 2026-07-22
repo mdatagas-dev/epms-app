@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { buildCompanyTemplate, extractCompanyInstruction, type TemplateMetadata, type TemplateStep } from "@/lib/company-template";
+import { buildTranslatedDocument, extractChineseDocumentPhrases } from "@/lib/docx-translator";
 import { buildTranslatedWorkbook, extractChinesePhrases } from "@/lib/xlsx-translator";
 
 const maxFileSize = 10 * 1024 * 1024;
@@ -35,24 +36,27 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setTemplateMetadata(null);
     setTemplateSteps([]);
     if (!nextFile) return;
-    if (!/\.xlsx?$/i.test(nextFile.name)) return setError("Choose an .xls or .xlsx workbook. Macro-enabled files are not supported.");
-    if (nextFile.size > maxFileSize) return setError("The workbook exceeds the 10 MB upload limit.");
+    if (!/\.(?:docx?|xlsx?)$/i.test(nextFile.name)) return setError("Choose a DOC, DOCX, XLS, or XLSX file. Macro-enabled files are not supported.");
+    if (nextFile.size > maxFileSize) return setError("The file exceeds the 10 MB upload limit.");
 
-    setBusy(nextFile.name.toLowerCase().endsWith(".xls") ? "converting" : "extracting");
+    const legacyExtension = nextFile.name.toLowerCase().match(/\.(doc|xls)$/)?.[1];
+    setBusy(legacyExtension ? "converting" : "extracting");
     try {
       let readableFile = nextFile;
-      if (nextFile.name.toLowerCase().endsWith(".xls")) {
+      if (legacyExtension) {
         const formData = new FormData();
         formData.append("workbook", nextFile);
         const response = await fetch("/api/instruction-translator/convert", { method: "POST", body: formData });
         if (!response.ok) {
           const result = await response.json() as { error?: string };
-          throw new Error(result.error ?? "The legacy workbook could not be converted.");
+          throw new Error(result.error ?? "The legacy file could not be converted.");
         }
-        readableFile = new File([await response.blob()], nextFile.name.replace(/\.xls$/i, ".xlsx"), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        const word = legacyExtension === "doc";
+        readableFile = new File([await response.blob()], nextFile.name.replace(/\.(doc|xls)$/i, word ? ".docx" : ".xlsx"), { type: word ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
         setBusy("extracting");
       }
-      const sources = await extractChinesePhrases(await readableFile.arrayBuffer());
+      const buffer = await readableFile.arrayBuffer();
+      const sources = readableFile.name.toLowerCase().endsWith(".docx") ? await extractChineseDocumentPhrases(buffer) : await extractChinesePhrases(buffer);
       setFile(readableFile);
       setPhrases(sources.map((source) => ({ source, translation: "" })));
       if (!sources.length) setError("No Chinese cell text was found in this workbook.");
@@ -122,11 +126,12 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setError("");
     try {
       const translations = Object.fromEntries(phrases.map((phrase) => [phrase.source, phrase.translation]));
-      const output = await buildTranslatedWorkbook(await file.arrayBuffer(), translations);
-      const url = URL.createObjectURL(new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const word = file.name.toLowerCase().endsWith(".docx");
+      const output = word ? await buildTranslatedDocument(await file.arrayBuffer(), translations) : await buildTranslatedWorkbook(await file.arrayBuffer(), translations);
+      const url = URL.createObjectURL(new Blob([output], { type: word ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = file.name.replace(/\.xlsx$/i, `-${targetLanguage}.xlsx`);
+      link.download = file.name.replace(/\.(docx|xlsx)$/i, `-${targetLanguage}.$1`);
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (cause) {
@@ -213,12 +218,12 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     <section className="panel translator-upload">
       <div>
         <p className="eyebrow">Source workbook</p>
-        <h2>{file?.name ?? "Choose a workbook"}</h2>
-        <p>Upload one XLS or XLSX file up to 10 MB. Legacy XLS files are securely converted by EPMS; XLSX text is processed in your browser.</p>
+        <h2>{file?.name ?? "Choose an Office document"}</h2>
+        <p>Upload one DOC, DOCX, XLS, or XLSX file up to 10 MB. Legacy files are securely converted by EPMS; modern files are processed in your browser.</p>
       </div>
       <label className="button button--secondary translator-file-button">
-        {busy === "converting" ? "Converting XLS..." : busy === "extracting" ? "Reading workbook..." : file ? "Choose another file" : "Choose XLS or XLSX"}
-        <input type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy !== null} onChange={(event) => { void selectFile(event.target.files?.[0]); event.target.value = ""; }}/>
+        {busy === "converting" ? "Converting legacy file..." : busy === "extracting" ? "Reading document..." : file ? "Choose another file" : "Choose Office file"}
+        <input type="file" accept=".doc,.docx,.xls,.xlsx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy !== null} onChange={(event) => { void selectFile(event.target.files?.[0]); event.target.value = ""; }}/>
       </label>
     </section>
 
@@ -228,7 +233,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
         <div className="translator-actions">
           <label className="field translator-language"><span>Target language</span><select value={targetLanguage} disabled={busy !== null || completed > 0} onChange={(event) => setTargetLanguage(event.target.value as TargetLanguage)}><option value="english">English</option><option value="indonesian">Bahasa Indonesia</option></select></label>
           <button type="button" className="button button--secondary" disabled={busy !== null || missing === 0} onClick={() => void translateMissing()}>{busy === "translating" ? "Translating..." : `AI translate to ${targetLabel}`}</button>
-          <button type="button" className="button button--primary" disabled={busy !== null || missing > 0} onClick={() => void downloadWorkbook()}>{busy === "downloading" ? "Building XLSX..." : `Download ${targetLabel} XLSX`}</button>
+          <button type="button" className="button button--primary" disabled={busy !== null || missing > 0} onClick={() => void downloadWorkbook()}>{busy === "downloading" ? "Building document..." : `Download ${targetLabel} ${file?.name.toLowerCase().endsWith(".docx") ? "DOCX" : "XLSX"}`}</button>
         </div>
       </div>
       <p className="translator-disclosure">AI Translate sends only the extracted cell phrases to the configured 9Router provider. The workbook and embedded images are not sent.</p>
@@ -240,7 +245,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
       </div>
     </section>}
 
-    {file && missing === 0 && targetLanguage === "english" && <section className="panel translator-upload">
+    {file?.name.toLowerCase().endsWith(".xlsx") && missing === 0 && targetLanguage === "english" && <section className="panel translator-upload">
       <div><p className="eyebrow">Company IK · Bahasa Indonesia</p><h2>Apply the approved company layout</h2><p>AI rewrites the reviewed English work content into concise Bahasa Indonesia, then EPMS drafts one page per numbered step while preserving metadata, photos, branding, styles, and print setup.</p></div>
       <button type="button" className="button button--secondary" disabled={busy !== null} onClick={() => void prepareCompanyTemplate()}>{busy === "preparing-template" ? "Generating Indonesian IK..." : templateMetadata ? "Regenerate Indonesian IK" : "Prepare Indonesian company IK"}</button>
     </section>}
