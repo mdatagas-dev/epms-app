@@ -13,7 +13,7 @@ type Phrase = { source: string; translation: string };
 type BusyState = "extracting" | "translating" | "downloading" | "preparing-template" | "building-template" | null;
 type TranslationMode = "english" | "production-id";
 
-export function InstructionTranslator() {
+export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConfigured: boolean }) {
   const [file, setFile] = useState<File | null>(null);
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [templateMetadata, setTemplateMetadata] = useState<TemplateMetadata | null>(null);
@@ -177,6 +177,14 @@ export function InstructionTranslator() {
   }
 
   return <div className="translator-workflow">
+    <section className="panel translator-upload">
+      <div>
+        <p className="eyebrow">AI provider</p>
+        <h2>{ninerouterConfigured ? "9Router configured on server" : "9Router uses local defaults"}</h2>
+        <p>{ninerouterConfigured ? "The server will authenticate translation requests using its protected environment configuration." : "For deployment, set NINEROUTER_BASE_URL and NINEROUTER_API_KEY in the server environment. Values are never exposed on this page."}</p>
+      </div>
+    </section>
+
     <section className="panel translator-upload">
       <div>
         <p className="eyebrow">Source workbook</p>

@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/session";
 
 const routerUrl = process.env.NINEROUTER_BASE_URL ?? "http://localhost:20128/v1";
+const routerApiKey = process.env.NINEROUTER_API_KEY;
 const model = "cx/gpt-5.4-mini";
 const chineseCharacter = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/u;
 const prompts = {
@@ -31,7 +32,10 @@ export async function POST(request: Request) {
   try {
     const response = await fetch(`${routerUrl.replace(/\/$/, "")}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(routerApiKey ? { Authorization: `Bearer ${routerApiKey}` } : {}),
+      },
       body: JSON.stringify({
         model,
         messages: [
