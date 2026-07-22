@@ -76,7 +76,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
 
     if (!response.ok || !result.translations) {
       const error = result.error ?? "AI translation failed.";
-      const providerFailure = /usage limit|rate limit|fetch failed|unavailable|timed? out|ECONN/i.test(error);
+      const providerFailure = /missing api key|unauthorized|forbidden|usage limit|rate limit|fetch failed|unavailable|timed? out|ECONN/i.test(error);
       if (phrases.length === 1 || providerFailure) throw new Error(error);
       const midpoint = Math.ceil(phrases.length / 2);
       return [
