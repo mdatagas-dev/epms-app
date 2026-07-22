@@ -29,9 +29,13 @@ USER node
 
 CMD ["node", "--experimental-strip-types", "scripts/migrate.ts"]
 
-FROM node:24-alpine AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libreoffice-calc-nogui \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \

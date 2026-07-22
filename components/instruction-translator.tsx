@@ -11,19 +11,22 @@ const translationConcurrency = 3;
 const companyTemplateUrl = "/templates/company-work-instruction.xlsx";
 
 type Phrase = { source: string; translation: string };
-type BusyState = "extracting" | "translating" | "downloading" | "preparing-template" | "building-template" | null;
-type TranslationMode = "english" | "production-id";
+type BusyState = "converting" | "extracting" | "translating" | "downloading" | "preparing-template" | "building-template" | null;
+type TargetLanguage = "english" | "indonesian";
+type TranslationMode = TargetLanguage | "production-id";
 
 export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConfigured: boolean }) {
   const [file, setFile] = useState<File | null>(null);
   const [phrases, setPhrases] = useState<Phrase[]>([]);
   const [templateMetadata, setTemplateMetadata] = useState<TemplateMetadata | null>(null);
   const [templateSteps, setTemplateSteps] = useState<TemplateStep[]>([]);
+  const [targetLanguage, setTargetLanguage] = useState<TargetLanguage>("english");
   const [busy, setBusy] = useState<BusyState>(null);
   const [error, setError] = useState("");
 
   const completed = phrases.filter((phrase) => phrase.translation.trim()).length;
   const missing = phrases.length - completed;
+  const targetLabel = targetLanguage === "english" ? "English" : "Bahasa Indonesia";
 
   async function selectFile(nextFile?: File) {
     setError("");
@@ -32,13 +35,25 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setTemplateMetadata(null);
     setTemplateSteps([]);
     if (!nextFile) return;
-    if (!nextFile.name.toLowerCase().endsWith(".xlsx")) return setError("Choose an .xlsx workbook. Legacy and macro-enabled files are not supported.");
+    if (!/\.xlsx?$/i.test(nextFile.name)) return setError("Choose an .xls or .xlsx workbook. Macro-enabled files are not supported.");
     if (nextFile.size > maxFileSize) return setError("The workbook exceeds the 10 MB upload limit.");
 
-    setBusy("extracting");
+    setBusy(nextFile.name.toLowerCase().endsWith(".xls") ? "converting" : "extracting");
     try {
-      const sources = await extractChinesePhrases(await nextFile.arrayBuffer());
-      setFile(nextFile);
+      let readableFile = nextFile;
+      if (nextFile.name.toLowerCase().endsWith(".xls")) {
+        const formData = new FormData();
+        formData.append("workbook", nextFile);
+        const response = await fetch("/api/instruction-translator/convert", { method: "POST", body: formData });
+        if (!response.ok) {
+          const result = await response.json() as { error?: string };
+          throw new Error(result.error ?? "The legacy workbook could not be converted.");
+        }
+        readableFile = new File([await response.blob()], nextFile.name.replace(/\.xls$/i, ".xlsx"), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        setBusy("extracting");
+      }
+      const sources = await extractChinesePhrases(await readableFile.arrayBuffer());
+      setFile(readableFile);
       setPhrases(sources.map((source) => ({ source, translation: "" })));
       if (!sources.length) setError("No Chinese cell text was found in this workbook.");
     } catch (cause) {
@@ -54,7 +69,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setBusy("translating");
     setError("");
     try {
-      await requestTranslationBatches(pending.map((phrase) => phrase.source), "english", (sources, translations) => {
+      await requestTranslationBatches(pending.map((phrase) => phrase.source), targetLanguage, (sources, translations) => {
         const translated = new Map(sources.map((source, index) => [source, translations[index]]));
         setPhrases((current) => current.map((phrase) => phrase.translation.trim() ? phrase : { ...phrase, translation: translated.get(phrase.source) ?? "" }));
       });
@@ -111,7 +126,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
       const url = URL.createObjectURL(new Blob([output], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = file.name.replace(/\.xlsx$/i, "-english.xlsx");
+      link.download = file.name.replace(/\.xlsx$/i, `-${targetLanguage}.xlsx`);
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (cause) {
@@ -198,33 +213,34 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     <section className="panel translator-upload">
       <div>
         <p className="eyebrow">Source workbook</p>
-        <h2>{file?.name ?? "Choose a work instruction"}</h2>
-        <p>Upload one XLSX file up to 10 MB. Cell and drawing text is extracted in your browser; images, formulas, styles, merges, and print settings remain unchanged.</p>
+        <h2>{file?.name ?? "Choose a workbook"}</h2>
+        <p>Upload one XLS or XLSX file up to 10 MB. Legacy XLS files are securely converted by EPMS; XLSX text is processed in your browser.</p>
       </div>
       <label className="button button--secondary translator-file-button">
-        {busy === "extracting" ? "Reading workbook..." : file ? "Choose another file" : "Choose XLSX"}
-        <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy !== null} onChange={(event) => { void selectFile(event.target.files?.[0]); event.target.value = ""; }}/>
+        {busy === "converting" ? "Converting XLS..." : busy === "extracting" ? "Reading workbook..." : file ? "Choose another file" : "Choose XLS or XLSX"}
+        <input type="file" accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy !== null} onChange={(event) => { void selectFile(event.target.files?.[0]); event.target.value = ""; }}/>
       </label>
     </section>
 
     {phrases.length > 0 && <section className="panel translator-review">
       <div className="translator-toolbar">
-        <div><p className="eyebrow">Translation review</p><h2>{completed} of {phrases.length} phrases ready</h2><p>Repeated Chinese phrases share one English translation throughout the workbook.</p></div>
+        <div><p className="eyebrow">Translation review</p><h2>{completed} of {phrases.length} phrases ready</h2><p>Repeated Chinese phrases share one {targetLabel} translation throughout the workbook.</p></div>
         <div className="translator-actions">
-          <button type="button" className="button button--secondary" disabled={busy !== null || missing === 0} onClick={() => void translateMissing()}>{busy === "translating" ? "Translating..." : "AI translate missing"}</button>
-          <button type="button" className="button button--primary" disabled={busy !== null || missing > 0} onClick={() => void downloadWorkbook()}>{busy === "downloading" ? "Building XLSX..." : "Download English XLSX"}</button>
+          <label className="field translator-language"><span>Target language</span><select value={targetLanguage} disabled={busy !== null || completed > 0} onChange={(event) => setTargetLanguage(event.target.value as TargetLanguage)}><option value="english">English</option><option value="indonesian">Bahasa Indonesia</option></select></label>
+          <button type="button" className="button button--secondary" disabled={busy !== null || missing === 0} onClick={() => void translateMissing()}>{busy === "translating" ? "Translating..." : `AI translate to ${targetLabel}`}</button>
+          <button type="button" className="button button--primary" disabled={busy !== null || missing > 0} onClick={() => void downloadWorkbook()}>{busy === "downloading" ? "Building XLSX..." : `Download ${targetLabel} XLSX`}</button>
         </div>
       </div>
       <p className="translator-disclosure">AI Translate sends only the extracted cell phrases to the configured 9Router provider. The workbook and embedded images are not sent.</p>
       <div className="translator-phrases">
         {phrases.map((phrase, index) => <div className="translator-row" key={phrase.source}>
           <div className="translator-source"><span>Chinese · {index + 1}</span><p lang="zh-CN">{phrase.source}</p></div>
-          <label><span>English</span><textarea value={phrase.translation} rows={Math.min(6, Math.max(2, phrase.source.split("\n").length))} placeholder="Enter or generate the English translation" onChange={(event) => setPhrases((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, translation: event.target.value } : item))}/></label>
+          <label><span>{targetLabel}</span><textarea value={phrase.translation} rows={Math.min(6, Math.max(2, phrase.source.split("\n").length))} placeholder={`Enter or generate the ${targetLabel} translation`} onChange={(event) => setPhrases((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, translation: event.target.value } : item))}/></label>
         </div>)}
       </div>
     </section>}
 
-    {file && missing === 0 && <section className="panel translator-upload">
+    {file && missing === 0 && targetLanguage === "english" && <section className="panel translator-upload">
       <div><p className="eyebrow">Company IK · Bahasa Indonesia</p><h2>Apply the approved company layout</h2><p>AI rewrites the reviewed English work content into concise Bahasa Indonesia, then EPMS drafts one page per numbered step while preserving metadata, photos, branding, styles, and print setup.</p></div>
       <button type="button" className="button button--secondary" disabled={busy !== null} onClick={() => void prepareCompanyTemplate()}>{busy === "preparing-template" ? "Generating Indonesian IK..." : templateMetadata ? "Regenerate Indonesian IK" : "Prepare Indonesian company IK"}</button>
     </section>}

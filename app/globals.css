@@ -399,6 +399,7 @@ td strong { font-weight: 650; }
 .translator-review { overflow: hidden; }
 .translator-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 22px; border-bottom: 1px solid var(--line); }
 .translator-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+.translator-language { min-width: 170px; }
 .translator-disclosure { margin: 0; padding: 10px 22px; border-bottom: 1px solid var(--line); background: var(--blue-soft); color: var(--muted); font-size: 10px; line-height: 1.5; }
 .translator-phrases { display: grid; max-height: 68vh; overflow-y: auto; }
 .translator-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; padding: 17px 22px; border-bottom: 1px solid var(--line); }
