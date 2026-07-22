@@ -7,6 +7,7 @@ import { buildTranslatedWorkbook, extractChinesePhrases } from "@/lib/xlsx-trans
 
 const maxFileSize = 10 * 1024 * 1024;
 const translationBatchSize = 10;
+const translationConcurrency = 3;
 const companyTemplateUrl = "/templates/company-work-instruction.xlsx";
 
 type Phrase = { source: string; translation: string };
@@ -53,12 +54,10 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setBusy("translating");
     setError("");
     try {
-      for (let offset = 0; offset < pending.length; offset += translationBatchSize) {
-        const batch = pending.slice(offset, offset + translationBatchSize);
-        const translations = await requestTranslations(batch.map((phrase) => phrase.source), "english");
-        const translated = new Map(batch.map((phrase, index) => [phrase.source, translations[index]]));
+      await requestTranslationBatches(pending.map((phrase) => phrase.source), "english", (sources, translations) => {
+        const translated = new Map(sources.map((source, index) => [source, translations[index]]));
         setPhrases((current) => current.map((phrase) => phrase.translation.trim() ? phrase : { ...phrase, translation: translated.get(phrase.source) ?? "" }));
-      }
+      });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "AI translation failed. You can continue manually.");
     } finally {
@@ -86,6 +85,20 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     }
 
     return result.translations;
+  }
+
+  async function requestTranslationBatches(sources: string[], mode: TranslationMode, onBatch?: (sources: string[], translations: string[]) => void) {
+    const translations: string[] = [];
+    const batches = Array.from({ length: Math.ceil(sources.length / translationBatchSize) }, (_, index) => sources.slice(index * translationBatchSize, (index + 1) * translationBatchSize));
+    for (let offset = 0; offset < batches.length; offset += translationConcurrency) {
+      const results = await Promise.all(batches.slice(offset, offset + translationConcurrency).map(async (batch) => {
+        const result = await requestTranslations(batch, mode);
+        onBatch?.(batch, result);
+        return result;
+      }));
+      translations.push(...results.flat());
+    }
+    return translations;
   }
 
   async function downloadWorkbook() {
@@ -123,10 +136,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
       setTemplateSteps(draft.steps);
 
       const sources = [...new Set(draft.steps.flatMap((step) => [step.title, step.instruction, ...step.keyPoints]).filter((value) => value.trim()))];
-      const indonesian: string[] = [];
-      for (let offset = 0; offset < sources.length; offset += translationBatchSize) {
-        indonesian.push(...await requestTranslations(sources.slice(offset, offset + translationBatchSize), "production-id"));
-      }
+      const indonesian = await requestTranslationBatches(sources, "production-id");
       const translatedContent = new Map(sources.map((source, index) => [source, indonesian[index]]));
       setTemplateSteps(draft.steps.map((step) => ({
         ...step,
