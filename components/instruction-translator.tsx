@@ -6,7 +6,7 @@ import { buildCompanyTemplate, extractCompanyInstruction, type TemplateMetadata,
 import { buildTranslatedDocument, extractDocumentBlocks, extractDocumentPhrases } from "@/lib/docx-translator";
 import { buildTranslatedWorkbook, extractWorkbookPhrases } from "@/lib/xlsx-translator";
 
-const maxFileSize = 10 * 1024 * 1024;
+const maxFileSize = 250 * 1024 * 1024;
 const translationBatchSize = 10;
 const translationConcurrency = 3;
 const companyTemplateUrl = "/templates/company-work-instruction.xlsx";
@@ -39,7 +39,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
     setTemplateSteps([]);
     if (!nextFile) return;
     if (!/\.(?:docx?|xlsx?)$/i.test(nextFile.name)) return setError("Choose a DOC, DOCX, XLS, or XLSX file. Macro-enabled files are not supported.");
-    if (nextFile.size > maxFileSize) return setError("The file exceeds the 10 MB upload limit.");
+    if (nextFile.size > maxFileSize) return setError("The file exceeds the 250 MB upload limit.");
 
     const legacyExtension = nextFile.name.toLowerCase().match(/\.(doc|xls)$/)?.[1];
     setBusy(legacyExtension ? "converting" : "extracting");
@@ -248,7 +248,7 @@ export function InstructionTranslator({ ninerouterConfigured }: { ninerouterConf
       <div>
         <p className="eyebrow">Source workbook</p>
         <h2>{file?.name ?? "Choose an Office document"}</h2>
-        <p>Upload one DOC, DOCX, XLS, or XLSX file up to 10 MB. Legacy files are securely converted by EPMS; modern files are processed in your browser.</p>
+        <p>Upload one DOC, DOCX, XLS, or XLSX file up to 250 MB. Legacy files are securely converted by EPMS; modern files are processed in your browser.</p>
       </div>
       <label className="button button--secondary translator-file-button">
         {busy === "converting" ? "Converting legacy file..." : busy === "extracting" ? "Reading document..." : file ? "Choose another file" : "Choose Office file"}

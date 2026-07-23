@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { getCurrentUser } from "@/lib/session";
 
 const run = promisify(execFile);
-const maxFileSize = 10 * 1024 * 1024;
+const maxFileSize = 250 * 1024 * 1024;
 const formats = {
   doc: { output: "docx", contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
   xls: { output: "xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   }
   const extension = workbook instanceof File ? workbook.name.toLowerCase().match(/\.(doc|xls)$/)?.[1] as keyof typeof formats | undefined : undefined;
   if (!(workbook instanceof File) || !extension || workbook.size === 0 || workbook.size > maxFileSize) {
-    return Response.json({ error: "Provide one valid legacy DOC or XLS file up to 10 MB." }, { status: 400 });
+    return Response.json({ error: "Provide one valid legacy DOC or XLS file up to 250 MB." }, { status: 400 });
   }
 
   const directory = await mkdtemp(join(tmpdir(), "epms-xls-"));
